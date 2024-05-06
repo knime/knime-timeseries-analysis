@@ -3,7 +3,7 @@ def BN = (BRANCH_NAME == 'master' || BRANCH_NAME.startsWith('releases/')) ? BRAN
 
 def repositoryName = "knime-timeseries-analysis"
 
-def extensionPath = "." // Path to knime.yml file
+def extensionPath = "./knime_extension" // Path to knime.yml file
 def outputPath = "output"
 
 library "knime-pipeline@$BN"
