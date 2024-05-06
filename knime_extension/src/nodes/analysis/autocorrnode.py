@@ -14,7 +14,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="Autocorrelation Plot",
+    name="Autocorrelation Plot (Labs)",
     node_type=knext.NodeType.VISUALIZER,
     icon_path="icons/Analysis/Autocorrelation_Analysis.png",
     category=kutil.category_analytics,
@@ -80,7 +80,9 @@ class AutoCorrNode:
 
         regression_target = df[self.target_col]
         self._exec_validate(regression_target)
+
         exec_context.set_progress(0.1)
+
         # compute acf values along with confidence intervals
         acf_x, acf_confint = acf(regression_target, nlags=self.max_lag, alpha=__alpha)
 

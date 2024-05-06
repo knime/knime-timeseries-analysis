@@ -8,8 +8,8 @@ from ..configs.preprocessing.aggrgran import AggregationGranularityParams
 LOGGER = logging.getLogger(__name__)
 
 
-@knext.node( 
-    name="Date&Time Aggregator",
+@knext.node(
+    name="Date&Time Aggregator (Labs)",
     node_type=knext.NodeType.MANIPULATOR,
     icon_path="icons/preprocessing/Aggregation_Granularity.png",
     category=kutil.category_processsing,
@@ -64,6 +64,8 @@ class AggregationGranularity:
         date_time_col_orig = df[self.aggreg_params.datetime_col]
         agg_col = df[self.aggreg_params.aggregation_column]
 
+        exec_context.set_progress(0.1)
+
         # get timestamp data type
         kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
 
@@ -80,6 +82,7 @@ class AggregationGranularity:
             # handle multiple iterable error. This is done to handle dynamic assignment of variables in case zoned date and time type is encountered
             date_time_col, kn_date_time_format = a[0], a[1]
 
+        exec_context.set_progress(0.5)
         # extract date&time fields from the input timestamp column
         df_time = kutil.extract_time_fields(
             date_time_col, kn_date_time_format, str(date_time_col.name)
@@ -96,12 +99,13 @@ class AggregationGranularity:
             raise knext.InvalidParametersError(
                 f"""Selected timestamp column does not contain {selected_time_granularity} field."""
             )
-
+        exec_context.set_progress(0.6)
         # modify the input timestamp as per the time_gran selected. This modifies the timestamp column depending on the granularity selected
         df_time_updated = self.__modify_time(
             selected_time_granularity, kn_date_time_format, df_time
         )
 
+        exec_context.set_progress(0.7)
         # if kn_date_time_format contains zone and if selected time granularity is less than day then append the zone back, other wise ignore
         if (kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL) and (
             selected_time_granularity in kutil.time_granularity_list()
@@ -112,6 +116,8 @@ class AggregationGranularity:
         df_grouped = self.__aggregate(
             df_time_updated, agg_col, selected_time_granularity, selected_aggreg_method
         )
+
+        exec_context.set_progress(0.8)
         if selected_time_granularity not in (
             self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
             self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
@@ -121,6 +127,7 @@ class AggregationGranularity:
                 [self.aggreg_params.datetime_col, self.aggreg_params.aggregation_column]
             ]
 
+        exec_context.set_progress(0.9)
         return knext.Table.from_pandas(df_grouped)
 
     def __modify_time(

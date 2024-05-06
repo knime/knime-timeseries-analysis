@@ -15,7 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="Residual Analyzer",
+    name="Residual Analyzer (Labs)",
     node_type=knext.NodeType.VISUALIZER,
     icon_path="icons/Analysis/Residual_Analyzer.png",
     category=kutil.category_analytics,
@@ -81,6 +81,8 @@ class ResidualAnalyzerNode:
         # Calculate Summary and Test Statistics
         summary_statistics = df_res[self.residuals_col].describe()
 
+        exec_context.set_progress(0.1)
+
         skewness = skew(df_res[self.residuals_col].dropna())
         kurtosis_value = kurtosis(df_res[self.residuals_col].dropna(), fisher=False)
 
@@ -91,6 +93,8 @@ class ResidualAnalyzerNode:
         # Set style
         sns.set_context("talk")
 
+        exec_context.set_progress(0.3)
+
         # Creating composite view
         fig, axs = plt.subplots(2, 2, figsize=(15, 15))
         fig.subplots_adjust(top=0.9, hspace=0.3)
@@ -100,6 +104,8 @@ class ResidualAnalyzerNode:
         subtitle = "Visual and Statistical Overview of Model Residuals"
         fig.suptitle(main_title, fontsize=32, fontweight="bold")
         fig.text(0.5, 0.94, subtitle, fontsize=18, ha="center")
+
+        exec_context.set_progress(0.4)
 
         # Residuals Plot
         axs[0, 0].scatter(
@@ -123,6 +129,8 @@ class ResidualAnalyzerNode:
         axs[0, 1].set_title("Histogram of Residuals", fontsize=20, fontweight="bold")
         axs[0, 1].set_xlabel("Residuals", fontsize=16, fontweight="bold")
         axs[0, 1].set_ylabel("Frequency", fontsize=16, fontweight="bold")
+
+        exec_context.set_progress(0.5)
 
         # Cumulative Sum Residuals Plot
         axs[1, 0].plot(
@@ -152,6 +160,8 @@ class ResidualAnalyzerNode:
         )
         ax2.tick_params(axis="y")
         ax2.grid(False)
+
+        exec_context.set_progress(0.8)
 
         # Textual Information (Summary Statistics, Metrics, Tests)
         text_str = "\n".join(
@@ -234,6 +244,8 @@ class ResidualAnalyzerNode:
         # df_stats.columns = ["Summary Statistics"]
         plt.tight_layout()
         plt.show()
+
+        exec_context.set_progress(0.9)
 
         return (
             knext.Table.from_pandas(df_out),

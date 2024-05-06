@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="Date&Time Aligner",
+    name="Date&Time Aligner (Labs)",
     node_type=knext.NodeType.MANIPULATOR,
     icon_path="icons/preprocessing/Timestamp_Alignment.png",
     category=kutil.category_processsing,
@@ -76,6 +76,8 @@ class TimestampAlignmentNode:
 
         kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
 
+        exec_context.set_progress(0.2)
+
         # if condition to handle zoned date&time
         if kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL:
             a = kutil.cast_to_related_type(kn_date_time_format, date_time_col_orig)
@@ -92,6 +94,7 @@ class TimestampAlignmentNode:
         # this variable is assigned to the period selected by the user
         selected_period = self.ts_align_params.period.lower()
 
+        exec_context.set_progress(0.3)
         # extract date&time fields from the input timestamp column
         df_time = kutil.extract_time_fields(
             date_time_col, kn_date_time_format, str(date_time_col.name)
@@ -112,12 +115,17 @@ class TimestampAlignmentNode:
             df_time_updated = self.__modify_time(kn_date_time_format, df_time)
 
         df = df.drop(columns=[self.ts_align_params.datetime_col])
+
+        exec_context.set_progress(0.4)
+
         df = (
             df_time_updated.merge(df, how="left", left_index=True, right_index=True)
             .reset_index(drop=True)
             .sort_values(self.ts_align_params.datetime_col + NEW_COLUMN)
             .reset_index(drop=True)
         )
+
+        exec_context.set_progress(0.7)
 
         if self.ts_align_params.replace_original:
             df = df.drop(columns=[self.ts_align_params.datetime_col]).rename(
@@ -127,6 +135,7 @@ class TimestampAlignmentNode:
                 }
             )
 
+        exec_context.set_progress(0.9)
         return knext.Table.from_pandas(df)
 
     def __modify_time(self, kn_date_format: str, df_time, tz=None) -> pd.DataFrame:

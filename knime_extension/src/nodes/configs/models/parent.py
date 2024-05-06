@@ -56,7 +56,7 @@ class _LearnerParams:
     )
 
     seasonal_period_param = knext.IntParameter(
-        label="Seasonal Period",
+        label="Seasonal Period (s)",
         description="Specify the length of the Seasonal Period",
         default_value=2,
         min_value=2,

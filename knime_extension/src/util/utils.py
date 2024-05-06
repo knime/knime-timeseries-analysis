@@ -52,7 +52,7 @@ TIME_FORMAT = "%H:%M:%S"
 category_processsing = knext.category(
     path="/community/ts",
     level_id="proc",
-    name="Preprocessing",
+    name="Preprocessing (Labs)",
     description="Nodes for pre-processing timestamp data.",
     icon="icons/Pre-processing.png",
 )
@@ -60,7 +60,7 @@ category_processsing = knext.category(
 category_models = knext.category(
     path="/community/ts",
     level_id="models",
-    name="Models",
+    name="Models (Labs)",
     description="Nodes for modelling time series",
     icon="icons/Models.png",
 )
@@ -68,7 +68,7 @@ category_models = knext.category(
 category_analytics = knext.category(
     path="/community/ts",
     level_id="analysis",
-    name="Analysis",
+    name="Analysis (Labs)",
     description="Nodes for analysis for time series application",
     icon="icons/Analytics.png",
 )

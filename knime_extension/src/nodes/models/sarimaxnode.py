@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="SARIMAX Learner",
+    name="SARIMAX Learner (Labs)",
     node_type=knext.NodeType.LEARNER,
     icon_path="icons/models/SARIMAX_Forecaster.png",
     category=kutil.category_models,
@@ -118,6 +118,8 @@ class SXForecaster:
 
         regression_target = df[self.sarimax_params.input_column]
 
+        exec_context.set_progress(0.1)
+
         self._exec_validate(regression_target, exog_var, exog_var_forecasts)
 
         # model initialization and training
@@ -138,6 +140,9 @@ class SXForecaster:
         )
         # maxiters set to default
         model_fit = model.fit()
+
+        exec_context.set_progress(0.5)
+
         residuals = model_fit.resid
 
         # in-samples
@@ -160,6 +165,8 @@ class SXForecaster:
 
             regression_target = np.log(regression_target)
 
+        exec_context.set_progress(0.6)
+
         # combine residuals and is-samples to as part of one dataframe
         in_samps_residuals = pd.concat([residuals, in_samples], axis=1)
         in_samps_residuals.columns = ["Residuals", "In-Samples"]
@@ -178,11 +185,16 @@ class SXForecaster:
         if self.sarimax_params.learner_params.natural_log:
             forecasts = np.exp(forecasts)
 
+        exec_context.set_progress(0.8)
+
         # populate model coefficients
         model_summary = self.model_summary(model_fit)
 
         model_binary = pickle.dumps(model_fit)
 
+
+        exec_context.set_progress(0.9)
+        
         return (
             knext.Table.from_pandas(forecasts),
             knext.Table.from_pandas(in_samps_residuals),

@@ -9,7 +9,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="Differencer",
+    name="Differencer (Labs)",
     node_type=knext.NodeType.MANIPULATOR,
     icon_path="icons/preprocessing/Differencing.png",
     category=kutil.category_processsing,
@@ -65,10 +65,15 @@ class SeasonalDifferencingNode:
 
         target_col = df[self.diff_params.target_column]
 
+        exec_context.set_progress(0.3)
+
         target_col_new = target_col.diff(periods=self.diff_params.lags)
 
+        exec_context.set_progress(0.9)
         df[
             self.diff_params.target_column + "(" + (str(-self.diff_params.lags)) + ")"
         ] = target_col_new
+
+        exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(df)

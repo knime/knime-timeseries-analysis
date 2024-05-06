@@ -10,7 +10,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="SARIMA Predictor",
+    name="SARIMA Predictor (Labs)",
     node_type=knext.NodeType.PREDICTOR,
     icon_path="icons/models/SARIMA_Forecaster-Apply.png",
     category=kutil.category_models,
@@ -51,13 +51,19 @@ class SarimaForcasterApply:
     def execute(self, exec_context: knext.ExecutionContext, model_input):
         model_fit = pickle.loads(model_input)
 
+        exec_context.set_progress(0.4)
+
         # make out-of-sample forecasts
         forecasts = model_fit.forecast(steps=self.number_of_forecasts).to_frame(
             name="Forecasts"
         )
 
+        exec_context.set_progress(0.6)
+
         # reverse log transformation for forecasts
         if self.natural_log:
             forecasts = np.exp(forecasts)
+
+        exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(forecasts)

@@ -5,9 +5,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 category = knext.category(
-    path="/community",
+    path="/labs",
     level_id="ts",
-    name="Time Series Analysis",
+    name="KNIME Timeseries Extension (Labs)",
     description="Python Nodes for Time Series Analysis",
     icon="icons/Time_Series_Analysis.png",
 )
