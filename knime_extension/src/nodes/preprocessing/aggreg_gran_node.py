@@ -38,7 +38,7 @@ class AggregationGranularity:
         configure_context: knext.ConfigurationContext,
         input_schema_1: knext.Schema,
     ):
-        # TODO Specify the output schema which depends on the selected parameters
+        # TODO Specify the output schema which depends on the selected parameters # NOSONAR
 
         # set date&time column by default
         self.aggreg_params.datetime_col = kutil.column_exists_or_preset(
@@ -140,9 +140,7 @@ class AggregationGranularity:
 
         df = df_time.copy()
 
-        date = df[self.aggreg_params.datetime_col].astype(
-            "datetime64[ns]"
-        )  # TODO Please rename date to date_col OR date_column
+        date_col = df[self.aggreg_params.datetime_col].astype("datetime64[ns]")
 
         # check if granularity level is
         if time_gran in (
@@ -152,35 +150,35 @@ class AggregationGranularity:
             self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
         ):
             # return year only
-            date = date.dt.year
-            df[self.aggreg_params.datetime_col] = date
+            date_col = date_col.dt.year
+            df[self.aggreg_params.datetime_col] = date_col
             df[self.aggreg_params.datetime_col] = df[
                 self.aggreg_params.datetime_col
             ].astype(np.int32)
 
-        # set input timestamp to date
+        # set input timestamp to date_col
         elif time_gran == self.aggreg_params.TimeGranularityOpts.DAY.name.lower():
-            # if pd.api.types.is_datetime64_any_dtype(date):
-            date = date.dt.date
-            # date = date
-            df[self.aggreg_params.datetime_col] = date
+
+            date_col = date_col.dt.date
+
+            df[self.aggreg_params.datetime_col] = date_col
 
         # round datetime to nearest hour
         elif time_gran == self.aggreg_params.TimeGranularityOpts.HOUR.name.lower():
             df[self.aggreg_params.datetime_col] = self.__floor_time(
-                kn_date_time_type, "H", date
+                kn_date_time_type, "H", date_col
             )
 
         # round datetime to nearest minute
         elif time_gran == self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower():
             df[self.aggreg_params.datetime_col] = self.__floor_time(
-                kn_date_time_type, "min", date
+                kn_date_time_type, "min", date_col
             )
 
         # round datetime to nearest second. This option is feasble if timestamp contains milliseconds/microseconds/nanoseconds.
         elif time_gran == self.aggreg_params.TimeGranularityOpts.SECOND.name.lower():
             df[self.aggreg_params.datetime_col] = self.__floor_time(
-                kn_date_time_type, "S", date
+                kn_date_time_type, "S", date_col
             )
 
         return df
@@ -237,7 +235,6 @@ class AggregationGranularity:
             .agg(value)
             .reset_index()
         )
-        # TODO Cast here to 32
         return df
 
     def __append_time_zone(self, date_col: pd.DataFrame, zoned: pd.Series):

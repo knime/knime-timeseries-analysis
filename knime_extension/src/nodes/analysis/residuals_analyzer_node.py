@@ -13,6 +13,9 @@ from statsmodels.stats.stattools import durbin_watson
 
 LOGGER = logging.getLogger(__name__)
 
+FIRST_COL_NAME = "Cumulative Sum of Residuals"
+SECOND_COL_NAME = "Cumulative Sum of Variance"
+
 
 @knext.node(
     name="Residual Analyzer (Labs)",
@@ -70,7 +73,7 @@ class ResidualAnalyzerNode:
                 knext.double(),
                 knext.double(),
             ],
-            ["Cumulative Sum of Residuals", "Cumulative Sum of Variance"],
+            [FIRST_COL_NAME, SECOND_COL_NAME],
         )
 
         summary_schema = knext.Column(knext.double(), "values")
@@ -140,7 +143,7 @@ class ResidualAnalyzerNode:
         axs[1, 0].set_title("Cumulative Sums", fontsize=20, fontweight="bold")
         axs[1, 0].set_xlabel("Observation", fontsize=16, fontweight="bold")
         axs[1, 0].set_ylabel(
-            "Cumulative Sum of Residuals",
+            FIRST_COL_NAME,
             color="#1f77b4",
             fontsize=16,
             fontweight="bold",
@@ -153,11 +156,9 @@ class ResidualAnalyzerNode:
             range(len(df_res[self.residuals_col])),
             ((df_res[self.residuals_col] ** 2).cumsum()),
             color="green",
-            label="Cumulative Sum of Variance",
+            label=SECOND_COL_NAME,
         )
-        ax2.set_ylabel(
-            "Cumulative Sum of Variance", color="green", fontsize=16, fontweight="bold"
-        )
+        ax2.set_ylabel(SECOND_COL_NAME, color="green", fontsize=16, fontweight="bold")
         ax2.tick_params(axis="y")
         ax2.grid(False)
 
@@ -166,7 +167,7 @@ class ResidualAnalyzerNode:
         # Textual Information (Summary Statistics, Metrics, Tests)
         text_str = "\n".join(
             (
-                f"Summary Statistics:",
+                "Summary Statistics:",
                 f"Mean: {summary_statistics['mean']:.2f}",
                 f"Std: {summary_statistics['std']:.2f}",
                 f"Min: {summary_statistics['min']:.2f}",
@@ -175,10 +176,10 @@ class ResidualAnalyzerNode:
                 f"Skewness: {skewness:.2f}",
                 f"Kurtosis: {kurtosis_value:.2f}",
                 "",
-                f"Normality Test (Shapiro-Wilk):",
+                "Normality Test (Shapiro-Wilk):",
                 f"Statistic: {normality_test[0]:.4f}, p-value: {normality_test[1]:.4g}",
                 "",
-                f"Autocorrelation Test (Durbin-Watson):",
+                "Autocorrelation Test (Durbin-Watson):",
                 f"Statistic: {dw_test:.4f}",
             )
         )
@@ -205,7 +206,7 @@ class ResidualAnalyzerNode:
             ],
             axis=1,
         )
-        df_out.columns = ["Cumulative Sum of Residuals", "Cumulative Sum of Variance"]
+        df_out.columns = [FIRST_COL_NAME, SECOND_COL_NAME]
 
         rename_col = "values"
         df_stats = pd.concat(
@@ -241,7 +242,6 @@ class ResidualAnalyzerNode:
             ]
         )
 
-        # df_stats.columns = ["Summary Statistics"]
         plt.tight_layout()
         plt.show()
 

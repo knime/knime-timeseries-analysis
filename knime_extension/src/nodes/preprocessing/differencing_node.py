@@ -1,8 +1,6 @@
 import logging
 import knime.extension as knext
 from util import utils as kutil
-import pandas as pd
-import numpy as np
 from ..configs.preprocessing.difference import SeasonalDifferencingParams
 
 LOGGER = logging.getLogger(__name__)

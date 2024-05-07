@@ -12,10 +12,15 @@ category = knext.category(
     icon="icons/Time_Series_Analysis.png",
 )
 
-from nodes.models import sarimanode, sarimaxnode, sarima_apply_node, sarimax_apply_node
-from nodes.preprocessing import (
-    aggreg_gran_node,
-    differencing_node,
-    timestamp_alignment_node,
-)
-from nodes.analysis import autocorrnode, residuals_analyzer_node
+from nodes.models import (  # noqa: E402
+    sarimanode,  # noqa: F401
+    sarimaxnode,  # noqa: F401
+    sarima_apply_node,  # noqa: F401
+    sarimax_apply_node,  # noqa: F401
+)  # NOSONAR
+from nodes.preprocessing import (  # noqa: E402
+    aggreg_gran_node,  # noqa: F401
+    differencing_node,  # noqa: F401
+    timestamp_alignment_node,  # noqa: F401
+)  # NOSONAR
+from nodes.analysis import autocorrnode, residuals_analyzer_node  # noqa: E402, F401

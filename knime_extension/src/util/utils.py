@@ -2,10 +2,11 @@
 Several utility functions are reused from Harvard's spatial data lab repository for Geospatial Analytics Extension.
 https://github.com/spatial-data-lab/knime-geospatial-extension/blob/main/knime_extension/src/util/knime_utils.py
 """
+
 import knime.extension as knext
 import pandas as pd
 from datetime import datetime, date, time, timedelta
-from typing import Callable, Union, Tuple
+from typing import Callable
 import logging
 
 
@@ -48,9 +49,10 @@ TIME_FORMAT = "%H:%M:%S"
 ############################################
 # Categories
 ############################################
+BASE_CATEGORY_PATH = "/labs/ts"
 
 category_processsing = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="proc",
     name="Preprocessing (Labs)",
     description="Nodes for pre-processing timestamp data.",
@@ -58,7 +60,7 @@ category_processsing = knext.category(
 )
 
 category_models = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="models",
     name="Models (Labs)",
     description="Nodes for modelling time series",
@@ -66,7 +68,7 @@ category_models = knext.category(
 )
 
 category_analytics = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="analysis",
     name="Analysis (Labs)",
     description="Nodes for analysis for time series application",

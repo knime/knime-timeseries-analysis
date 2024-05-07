@@ -3,7 +3,6 @@ import knime.extension as knext
 from util import utils as kutil
 import pandas as pd
 from ..configs.preprocessing.timealign import TimeStampAlignmentParams
-import datetime
 
 NEW_COLUMN = " (New)"
 
@@ -211,9 +210,9 @@ class TimestampAlignmentNode:
         ).rename(columns={0: self.ts_align_params.datetime_col + NEW_COLUMN})
 
         # do a left join and return only the actual time input and updated timestamp column
-        new_df = df3.merge(
+        new_df = df3.merge( # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
-        )  # .reset_index(drop=True)
+        )  
         new_df = new_df[
             [
                 self.ts_align_params.datetime_col,

@@ -2,9 +2,7 @@ import logging
 import knime.extension as knext
 from util import utils as kutil
 from ..configs.models.sarimax_apply import SarimaxForecasterParms
-import pandas as pd
 import numpy as np
-from statsmodels.tsa.statespace.sarimax import SARIMAX
 import pickle
 
 LOGGER = logging.getLogger(__name__)
@@ -36,7 +34,7 @@ class SXForecaster:
     def configure(
         self,
         configure_context: knext.ConfigurationContext,
-        input_model,
+        input_schema_1,  # NOSONAR
         input_schema_2,
     ):
         # set exog input for forecasting

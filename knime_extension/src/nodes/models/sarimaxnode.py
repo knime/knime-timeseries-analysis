@@ -194,12 +194,12 @@ class SXForecaster:
 
 
         exec_context.set_progress(0.9)
-        
+
         return (
             knext.Table.from_pandas(forecasts),
             knext.Table.from_pandas(in_samps_residuals),
             knext.Table.from_pandas(model_summary),
-            bytes(model_binary),
+            model_binary,
         )
 
     # function to perform validation on dataframe within execution context
