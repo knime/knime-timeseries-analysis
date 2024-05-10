@@ -74,7 +74,10 @@ try {
                         'knime-reporting',
                         'knime-filehandling',
                         ],
-                ],
+                    ius: [
+                        'org.knime.features.core.columnar.feature.group'                        
+                    ]
+                ]
             )
         }
     }
