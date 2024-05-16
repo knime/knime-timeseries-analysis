@@ -1,9 +1,11 @@
 import logging
+import json
 import knime.extension as knext
 from util import utils as kutil
 import pandas as pd
 import numpy as np
 from ..configs.preprocessing.aggrgran import AggregationGranularityParams
+from enum import Enum
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,8 +57,639 @@ class AggregationGranularity:
             input_schema_1,
             kutil.is_numeric,
         )
+        # import debugpy
 
-        return None
+        # debugpy.listen(5678)
+        # print("Waiting for debugger attach")
+        # debugpy.wait_for_client()
+        # debugpy.breakpoint()
+
+        return self.__configure_specs(input_schema_1)
+
+    def __configure_specs(self, input_schema: knext.Schema) -> knext.Schema:
+        output_schema = None
+        col_names = input_schema.column_names
+        LOGGER.warn(col_names)
+
+        # get data type of the target column ==> double or int
+        input_aggregation_column_ktype = (
+            input_schema[:]
+            .delegate._columns[col_names.index(self.aggreg_params.aggregation_column)]
+            .ktype
+        )
+
+        LOGGER.warn(type(input_aggregation_column_ktype))
+
+        # get knime data type of the selected timestamp column
+        input_timestamp_ktype = (
+            input_schema[:]
+            .delegate._columns[col_names.index(self.aggreg_params.datetime_col)]
+            .ktype
+        )
+        # TODO: Get rid of the LOGGER statements
+        LOGGER.warning(f"{input_timestamp_ktype=}")
+
+        # get the value factory string of the respective datetime type;
+        # eg. ZonedDateTimeValueFactory2, LocalDateTimeValueFactory, LocalDateValueFactory and LocalTimeValueFactory
+        time_stamp_logical_type = json.loads(input_timestamp_ktype.logical_type).get(
+            "value_factory_class"
+        )
+
+        # TODO: Get rid of the LOGGER statements
+        LOGGER.warning(time_stamp_logical_type)
+
+        # if aggregation column is double, the final output of aggregation column after aggregation will always be double
+        if input_aggregation_column_ktype == knext.double():
+            # TODO: Get rid of the LOGGER statements
+            LOGGER.warning("we are in double")
+            # if input column is of type TIME, then return the following specs
+            if time_stamp_logical_type == kutil.LOCAL_TIME_VALUE:
+
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if (  # if "count" method is encountered, then the output type of target will be long
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+
+                        output_schema = self.__time_schema(True)
+
+                    else:
+                        output_schema = self.__time_schema(False)
+
+                    return output_schema
+                else:
+                    raise ValueError(
+                        f"Incompatible time granularity, {self.aggreg_params.time_granularity}, selected."
+                    )
+
+            elif time_stamp_logical_type == kutil.LOCAL_DATE_VALUE:
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_three_cols(True)
+                    else:
+                        output_schema = self.__year_schema_three_cols(False)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__date_schema(True)
+                    else:
+                        output_schema = self.__date_schema(False)
+
+                    return output_schema
+
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_two_cols(True)
+                    else:
+                        output_schema = self.__year_schema_two_cols(False)
+
+                    return output_schema
+                else:
+                    raise ValueError(
+                        f"Incompatible time granularity, {self.aggreg_params.time_granularity}, selected."
+                    )
+
+            elif time_stamp_logical_type == kutil.LOCAL_DATE_TIME_VALUE:
+                #         # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_three_cols(True)
+                    else:
+                        output_schema = self.__year_schema_three_cols(False)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__date_schema(True)
+                    else:
+                        output_schema = self.__date_schema(False)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_two_cols(True)
+                    else:
+                        output_schema = self.__year_schema_two_cols(False)
+
+                    return output_schema
+                elif self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__datetime_schema(True)
+                    else:
+                        output_schema = self.__datetime_schema(False)
+
+                    return output_schema
+
+            elif time_stamp_logical_type == kutil.ZONED_DATE_TIME_ZONE_VALUE:
+
+
+
+            
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if (
+                        # only count aggregation method from Pandas returns a Long or int64 data type.
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_three_cols(True)
+                    else:
+                        output_schema = self.__year_schema_three_cols(False)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__date_schema(True)
+                    else:
+                        output_schema = self.__date_schema(False)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__year_schema_two_cols(True)
+                    else:
+                        output_schema = self.__year_schema_two_cols(False)
+
+                    return output_schema
+
+                elif self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if (
+                        self.aggreg_params.aggregation_methods.lower()
+                        == self.aggreg_params.AggregationMethods.COUNT.name.lower()
+                    ):
+                        output_schema = self.__zoned_datetime_schema(True)
+                    else:
+                        output_schema = self.__zoned_datetime_schema(False)
+
+                    return output_schema
+
+        elif input_aggregation_column_ktype in [
+            knext.int32(),
+            knext.int64(),
+        ]:  # knext.int64() has been pulled out since now this returns all target aggregations except for the method "Mean" and "Variance" of type long/int64
+            # TODO: Get rid of the LOGGER statements
+            LOGGER.warning("we are in integer/long")
+            # if input column is of type TIME, then return the following specs
+            if time_stamp_logical_type == kutil.LOCAL_TIME_VALUE:
+
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+
+                        output_schema = self.__time_schema(False)
+
+                    else:
+                        output_schema = self.__time_schema(True)
+
+                    return output_schema
+                else:
+                    raise ValueError(
+                        f"Incompatible time granularity, {self.aggreg_params.time_granularity}, selected."
+                    )
+
+            elif time_stamp_logical_type == kutil.LOCAL_DATE_VALUE:
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_three_cols(False)
+                    else:
+                        output_schema = self.__year_schema_three_cols(True)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__date_schema(False)
+                    else:
+                        output_schema = self.__date_schema(True)
+
+                    return output_schema
+
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_two_cols(False)
+                    else:
+                        output_schema = self.__year_schema_two_cols(True)
+
+                    return output_schema
+                else:
+                    raise ValueError(
+                        f"Incompatible time granularity, {self.aggreg_params.time_granularity}, selected."
+                    )
+
+            elif time_stamp_logical_type == kutil.LOCAL_DATE_TIME_VALUE:
+                #         # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_three_cols(False)
+                    else:
+                        output_schema = self.__year_schema_three_cols(True)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__date_schema(False)
+                    else:
+                        output_schema = self.__date_schema(True)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_two_cols(False)
+                    else:
+                        output_schema = self.__year_schema_two_cols(True)
+
+                    return output_schema
+                elif self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__datetime_schema(False)
+                    else:
+                        output_schema = self.__datetime_schema(True)
+
+                    return output_schema
+
+            elif time_stamp_logical_type == kutil.ZONED_DATE_TIME_ZONE_VALUE:
+                # write logic here wrt to expected output after execution
+                if self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.WEEK.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MONTH.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_three_cols(False)
+                        # output_schema = self.__create_schema(target_column_is_of_type_double=False, )
+                    else:
+                        output_schema = self.__year_schema_three_cols(True)
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.DAY.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__date_schema(False)
+                    else:
+                        output_schema = self.__date_schema(True)
+
+                    return output_schema
+                elif (
+                    self.aggreg_params.time_granularity.lower()
+                    == self.aggreg_params.TimeGranularityOpts.YEAR.name.lower()
+                ):
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__year_schema_two_cols(False)
+                    else:
+                        output_schema = self.__year_schema_two_cols(True)
+
+                    return output_schema
+
+                elif self.aggreg_params.time_granularity.lower() in [
+                    self.aggreg_params.TimeGranularityOpts.HOUR.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.MINUTE.name.lower(),
+                    self.aggreg_params.TimeGranularityOpts.SECOND.name.lower(),
+                ]:
+                    if self.aggreg_params.aggregation_methods.lower() in [
+                        self.aggreg_params.AggregationMethods.MEAN.name.lower(),
+                        self.aggreg_params.AggregationMethods.VARIANCE.name.lower(),
+                    ]:
+                        output_schema = self.__zoned_datetime_schema(False)
+                    else:
+                        output_schema = self.__zoned_datetime_schema(True)
+
+                    return output_schema
+        LOGGER.warn(f"{output_schema=}")
+        return output_schema
+
+    # def __year_schema_three_cols(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.int32(),
+    #                 knext.int32(),
+    #                 knext.int32(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.time_granularity.lower(),
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+    #         return knext.Schema(
+    #             [
+    #                 knext.int32(),
+    #                 knext.int32(),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.time_granularity.lower(),
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+
+    # def __year_schema_two_cols(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.int32(),
+    #                 knext.int32(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+    #         return knext.Schema(
+    #             [
+    #                 knext.int32(),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+
+    # def __date_schema(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=False, timezone=False),
+    #                 knext.int32(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=False, timezone=False),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+
+    # def __datetime_schema(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=True, timezone=False),
+    #                 knext.int32(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=True, timezone=False),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+
+    class AggregationCategory(Enum):
+        YEAR = 1
+        DAY_OR_SHORTER = 2
+        WEEK_OR_LONGER = 3
+
+    # "switch_agg": whether the output column 'target' is of type double or int - target_column_is_of_type_double
+    def __create_schema(
+        self,
+        target_column_is_of_type_double: bool,
+        contains_timezone: bool,
+        contains_time: bool,
+        contains_date: bool,
+        aggregation_category: AggregationCategory,
+    ):
+
+        # specify first column
+        if aggregation_category is not self.AggregationCategory.DAY_OR_SHORTER:
+            data_types = [knext.int32()]  # TODO doublecheck
+        else:
+            data_types = [
+                knext.datetime(
+                    date=contains_date, time=contains_time, timezone=contains_timezone
+                )
+            ]
+
+        column_names = [self.aggreg_params.datetime_col]
+
+        # specify optional second column
+        if self.AggregationCategory.WEEK_OR_LONGER:
+            data_types.append(knext.int32())
+            column_names.append(self.aggreg_params.time_granularity.lower())
+
+        # specify third column
+        data_types.append(
+            knext.double() if target_column_is_of_type_double else knext.int64()
+        )
+        column_names.append(self.aggreg_params.aggregation_column)
+
+        return knext.Schema(data_types, column_names)
+
+    # switch_agg is the boolean flag to enable int or double data type in the aggregated data type. If false, then type will be double and int otherwise.
+    # Pandas upon aggregation on "COUNT" returns the aggregated column in int64/Long format. if false, then ktype will be int32 (means aggregation methos is not count) else int64.
+    # def __time_schema(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=False, time=True, timezone=False),
+    #                 knext.int32(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=False, time=True, timezone=False),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+
+    # def __zoned_datetime_schema(self, switch_agg=False):
+
+    #     if switch_agg:
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=True, timezone=True),
+    #                 knext.int64(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
+    #     else:
+
+    #         return knext.Schema(
+    #             [
+    #                 knext.datetime(date=True, time=True, timezone=True),
+    #                 knext.double(),
+    #             ],
+    #             [
+    #                 self.aggreg_params.datetime_col,
+    #                 self.aggreg_params.aggregation_column,
+    #             ],
+    #         )
 
     def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Schema):
         df = input_1.to_pandas()
@@ -117,6 +750,11 @@ class AggregationGranularity:
             df_time_updated, agg_col, selected_time_granularity, selected_aggreg_method
         )
 
+        # down cast aggregation to int32
+        df_grouped[self.aggreg_params.aggregation_column] = df_grouped[
+            self.aggreg_params.aggregation_column
+        ].astype(np.int32)
+
         exec_context.set_progress(0.8)
         if selected_time_granularity not in (
             self.aggreg_params.TimeGranularityOpts.QUARTER.name.lower(),
@@ -126,7 +764,6 @@ class AggregationGranularity:
             df_grouped = df_grouped[
                 [self.aggreg_params.datetime_col, self.aggreg_params.aggregation_column]
             ]
-
         exec_context.set_progress(0.9)
         return knext.Table.from_pandas(df_grouped)
 
@@ -140,7 +777,13 @@ class AggregationGranularity:
 
         df = df_time.copy()
 
-        date_col = df[self.aggreg_params.datetime_col].astype("datetime64[ns]")
+        # TODO: mention in commit message about the reconverting to datetime and then just extracting the time values
+        if kn_date_time_type == kutil.DEF_TIME_LABEL:
+            date_col = pd.to_datetime(
+                df[self.aggreg_params.datetime_col], format=kutil.TIME_FORMAT
+            ).dt.strftime("%H:%M:%S")
+        else:
+            date_col = df[self.aggreg_params.datetime_col].astype("datetime64[ns]")
 
         # check if granularity level is
         if time_gran in (
@@ -225,7 +868,6 @@ class AggregationGranularity:
                 time_gran,
             ]
         ]
-
         # select granularity
         value = self.aggreg_params.AggregationDictionary[agg_type.upper()].value[1]
 

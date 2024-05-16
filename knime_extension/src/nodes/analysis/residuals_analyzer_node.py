@@ -175,10 +175,8 @@ class ResidualAnalyzerNode:
                 f"Max: {summary_statistics['max']:.2f}",
                 f"Skewness: {skewness:.2f}",
                 f"Kurtosis: {kurtosis_value:.2f}",
-                "",
                 "Normality Test (Shapiro-Wilk):",
                 f"Statistic: {normality_test[0]:.4f}, p-value: {normality_test[1]:.4g}",
-                "",
                 "Autocorrelation Test (Durbin-Watson):",
                 f"Statistic: {dw_test:.4f}",
             )

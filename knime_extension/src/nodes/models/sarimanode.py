@@ -104,6 +104,7 @@ class SarimaForcaster:
 
         # validate if target variable has any missing values or not
         self._exec_validate(regression_target)
+
         exec_context.set_progress(0.3)
         # model initialization and training
         model = SARIMAX(

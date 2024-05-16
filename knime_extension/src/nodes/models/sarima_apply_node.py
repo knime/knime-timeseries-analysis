@@ -2,7 +2,6 @@ import logging
 import knime.extension as knext
 from util import utils as kutil
 from ..configs.models.sarima_apply import SPredictorApplyParams
-import pandas as pd
 import numpy as np
 import pickle
 
@@ -37,8 +36,11 @@ class SarimaForcasterApply:
     dynamic_check = sarima_params.dynamic_check
     number_of_forecasts = sarima_params.number_of_forecasts
 
-    # merge in-samples and residuals (In-Samples & Residuals)
-    def configure(self, configure_context, input_schema_1):
+    def configure(
+        self,
+        configure_context: knext.ConfigurationContext,
+        input_schema_1: knext.Schema,  # NOSONAR input_schema is necessary
+    ):
         if self.natural_log and self.dynamic_check:
             configure_context.set_warning(
                 "Enabling dynamic predictions with log transformation can create invalid predictions."

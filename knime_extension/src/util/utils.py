@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime, date, time, timedelta
 from typing import Callable
 import logging
+import numpy as np
 
 
 LOGGER = logging.getLogger(__name__)
@@ -268,7 +269,11 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
         df["hour"] = df[series_name].dt.hour
         df["minute"] = df[series_name].dt.minute
@@ -282,7 +287,11 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
 
         df[series_name] = df[series_name].dt.date
@@ -307,7 +316,11 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
         df["hour"] = df[series_name].dt.hour
         df["minute"] = df[series_name].dt.minute

@@ -1,6 +1,5 @@
 from .parent import _LearnerParams, _PredictorParams
 import knime.extension as knext
-import pickle
 from util import utils as kutil
 
 
@@ -20,7 +19,6 @@ class SLearnerParams(_LearnerParams):
 
 @knext.parameter_group(label="Sarima Predictor Parameters")
 class SPredictorParams(_PredictorParams):
-
     """
 
     SARIMA Predictor Parameter class inheriting the private class _PredictorParams above.
