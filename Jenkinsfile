@@ -73,9 +73,11 @@ try {
                         'knime-javasnippet',
                         'knime-reporting',
                         'knime-filehandling',
-                        repositoryName
                         ],
-                ],
+                    ius: [
+                        'org.knime.features.core.columnar.feature.group'                        
+                    ]
+                ]
             )
         }
     }
