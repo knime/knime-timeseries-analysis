@@ -41,7 +41,6 @@ class AggregationGranularity:
         configure_context: knext.ConfigurationContext,
         input_schema_1: knext.Schema,
     ):
-        # TODO Specify the output schema which depends on the selected parameters # NOSONAR
 
         # set date&time column by default
         self.aggreg_params.datetime_col = kutil.column_exists_or_preset(
@@ -63,7 +62,7 @@ class AggregationGranularity:
 
     def __configure_specs(self, input_schema: knext.Schema) -> knext.Schema:
         """
-        This function runs the logic of all possible combinations that can produce output schema contianing:
+        This function runs the logic of all possible combinations that can produce output schema containing:
 
         1) 2 or 3 columns.
         2) The timestamp data type after performing the aggregation upon the the selected dattime field.
