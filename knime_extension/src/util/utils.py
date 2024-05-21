@@ -55,7 +55,7 @@ BASE_CATEGORY_PATH = "/labs/ts"
 category_processsing = knext.category(
     path=BASE_CATEGORY_PATH,
     level_id="proc",
-    name="Preprocessing (Labs)",
+    name="Preprocessing",
     description="Nodes for pre-processing timestamp data.",
     icon="icons/Pre-processing.png",
 )
@@ -63,7 +63,7 @@ category_processsing = knext.category(
 category_models = knext.category(
     path=BASE_CATEGORY_PATH,
     level_id="models",
-    name="Models (Labs)",
+    name="Models",
     description="Nodes for modelling time series",
     icon="icons/Models.png",
 )
@@ -71,7 +71,7 @@ category_models = knext.category(
 category_analytics = knext.category(
     path=BASE_CATEGORY_PATH,
     level_id="analysis",
-    name="Analysis (Labs)",
+    name="Analysis",
     description="Nodes for analysis for time series application",
     icon="icons/Analytics.png",
 )
