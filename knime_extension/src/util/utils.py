@@ -207,12 +207,12 @@ def time_granularity_list() -> list:
     @return: list of item fields in Time
     """
     return [
-        "hour",
-        "minute",
-        "second",
+        "Hour",
+        "Minute",
+        "Second",
         # not supported yet
-        "millisecond",
-        "microsecond",
+        "Millisecond",
+        "Microsecond",
     ]
 
 
@@ -262,6 +262,7 @@ def extract_time_fields(
     @return: Pandas datafram with timestamp column and relevant date&time fields.
     """
 
+    cols_cap = [series_name]
     if date_time_format == DEF_ZONED_DATE_LABEL:
         df = pd.to_datetime(date_time_col, format=ZONED_DATE_TIME_FORMAT).to_frame()
 
@@ -279,6 +280,9 @@ def extract_time_fields(
         df["minute"] = df[series_name].dt.minute
         df["second"] = df[series_name].dt.second
 
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
         return df
 
     elif date_time_format == DEF_DATE_LABEL:
@@ -296,6 +300,10 @@ def extract_time_fields(
 
         df[series_name] = df[series_name].dt.date
 
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
+
         return df
 
     elif date_time_format == DEF_TIME_LABEL:
@@ -307,6 +315,10 @@ def extract_time_fields(
 
         # ensure to do this in the end
         df[series_name] = df[series_name].dt.time
+
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
 
         return df
 
@@ -325,6 +337,10 @@ def extract_time_fields(
         df["hour"] = df[series_name].dt.hour
         df["minute"] = df[series_name].dt.minute
         df["second"] = df[series_name].dt.second
+
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
 
         return df
 

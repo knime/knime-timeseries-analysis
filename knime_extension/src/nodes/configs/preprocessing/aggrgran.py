@@ -1,3 +1,4 @@
+from enum import Enum
 import knime.extension as knext
 from util import utils as kutil
 import pandas as pd
@@ -148,3 +149,8 @@ class AggregationGranularityParams:
         default_value=AggregationMethods.get_default().name,
         enum=AggregationMethods,
     )
+
+    class AggregationCategory(Enum):
+        YEAR = 1
+        DAY_OR_SHORTER = 2
+        WEEK_OR_LONGER = 3

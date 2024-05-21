@@ -71,8 +71,10 @@ class TimestampAlignmentNode:
     def execute(self, exec_context: knext.ExecutionContext, input_table):
         df = input_table.to_pandas()
 
+        # select timestamp column
         date_time_col_orig = df[self.ts_align_params.datetime_col]
 
+        # get factory type of the timestamp
         kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
 
         exec_context.set_progress(0.2)
@@ -91,7 +93,7 @@ class TimestampAlignmentNode:
             date_time_col, kn_date_time_format = a[0], a[1]
 
         # this variable is assigned to the period selected by the user
-        selected_period = self.ts_align_params.period.lower()
+        selected_period = self.ts_align_params.period.capitalize()
 
         exec_context.set_progress(0.3)
         # extract date&time fields from the input timestamp column
@@ -137,7 +139,9 @@ class TimestampAlignmentNode:
         exec_context.set_progress(0.9)
         return knext.Table.from_pandas(df)
 
-    def __modify_time(self, kn_date_format: str, df_time, tz=None) -> pd.DataFrame:
+    def __modify_time(
+        self, kn_date_format: str, df_time: pd.DataFrame, tz=None
+    ) -> pd.DataFrame:
         """
         This function is where the date column is processed to fill in for missing time stamp values
         """
@@ -210,9 +214,9 @@ class TimestampAlignmentNode:
         ).rename(columns={0: self.ts_align_params.datetime_col + NEW_COLUMN})
 
         # do a left join and return only the actual time input and updated timestamp column
-        new_df = df3.merge( # NOSONAR 'on' and 'validate'  do not really need do be specified here
+        new_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
-        )  
+        )
         new_df = new_df[
             [
                 self.ts_align_params.datetime_col,
