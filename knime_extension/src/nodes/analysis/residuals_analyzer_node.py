@@ -1,5 +1,5 @@
 import logging
-import knime_extension as knext
+import knime.extension as knext
 from util import utils as kutil
 from ..configs.analysis.residuals_analyzer import ResidualAnalyzerParams
 import pandas as pd
@@ -29,7 +29,7 @@ SECOND_COL_NAME = "Cumulative Sum of Variance"
     description="The input table that contains a numeric column representing the residuals from a forecasting model.",
 )
 @knext.output_table(
-    name="Cummulative Sum or Residuals & Variance",
+    name="Cummulative Sum of Residuals & Variance",
     description="Table containing the values from the Cumulative sums plot.",
 )
 @knext.output_table(
@@ -68,7 +68,7 @@ class ResidualAnalyzerNode:
             kutil.is_numeric,
         )
 
-        output_schema_1 = knext.Schema(
+        cumm_sum_schema = knext.Schema(
             [
                 knext.double(),
                 knext.double(),
@@ -76,12 +76,12 @@ class ResidualAnalyzerNode:
             [FIRST_COL_NAME, SECOND_COL_NAME],
         )
 
-        summary_schema = knext.Column(knext.double(), "values")
-        return (output_schema_1, summary_schema)
+        stats_schema = knext.Column(knext.double(), "Values")
+        return (cumm_sum_schema, stats_schema)
 
-    def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Table):
-        df_res = input_1.to_pandas()
-        # Calculate Summary and Test Statistics
+    def execute(self, exec_context: knext.ExecutionContext, input: knext.Table):
+        df_res = input.to_pandas()
+        # Calculate summary and test statistics
         summary_statistics = df_res[self.residuals_col].describe()
 
         exec_context.set_progress(0.1)
@@ -89,7 +89,7 @@ class ResidualAnalyzerNode:
         skewness = skew(df_res[self.residuals_col].dropna())
         kurtosis_value = kurtosis(df_res[self.residuals_col].dropna(), fisher=False)
 
-        # Perform Tests
+        # Perform tests
         normality_test = stats.shapiro(df_res[self.residuals_col].dropna())
         dw_test = durbin_watson(df_res[self.residuals_col].dropna())
 
@@ -102,7 +102,7 @@ class ResidualAnalyzerNode:
         fig, axs = plt.subplots(2, 2, figsize=(15, 15))
         fig.subplots_adjust(top=0.9, hspace=0.3)
 
-        # Main Title and Subtitle
+        # Main title and subtitle
         main_title = "Residuals Analysis"
         subtitle = "Visual and Statistical Overview of Model Residuals"
         fig.suptitle(main_title, fontsize=32, fontweight="bold")
@@ -110,7 +110,7 @@ class ResidualAnalyzerNode:
 
         exec_context.set_progress(0.4)
 
-        # Residuals Plot
+        # Residuals plot
         axs[0, 0].scatter(
             x=range(len(df_res[self.residuals_col])),
             y=df_res[self.residuals_col],
@@ -121,7 +121,7 @@ class ResidualAnalyzerNode:
         axs[0, 0].set_xlabel("Observation", fontsize=16, fontweight="bold")
         axs[0, 0].set_ylabel("Residuals", fontsize=16, fontweight="bold")
 
-        # Histogram Plot
+        # Histogram plot
         sns.histplot(
             df_res[self.residuals_col],
             kde=self.kde,
@@ -197,16 +197,16 @@ class ResidualAnalyzerNode:
             transform=axs[1, 1].transAxes,
         )
 
-        df_out = pd.concat(
+        df_cumm_sum = pd.concat(
             [
                 pd.DataFrame(df_res[self.residuals_col].cumsum()),
                 pd.DataFrame((df_res[self.residuals_col] ** 2).cumsum()),
             ],
             axis=1,
         )
-        df_out.columns = [FIRST_COL_NAME, SECOND_COL_NAME]
+        df_cumm_sum.columns = [FIRST_COL_NAME, SECOND_COL_NAME]
 
-        rename_col = "values"
+        rename_col = "Values"
         df_stats = pd.concat(
             [
                 summary_statistics.to_frame().rename(
@@ -246,7 +246,7 @@ class ResidualAnalyzerNode:
         exec_context.set_progress(0.9)
 
         return (
-            knext.Table.from_pandas(df_out),
+            knext.Table.from_pandas(df_cumm_sum),
             knext.Table.from_pandas(df_stats),
             knext.view_matplotlib(),
         )

@@ -32,7 +32,7 @@ class SPredictorParams(_PredictorParams):
 
 
 @knext.parameter_group(label="Settings")
-class SarimaForecasterParms:
+class SarimaForecasterParams:
     """
 
     SARIMA settings to configure the parameters for the model.

@@ -5,7 +5,6 @@ https://github.com/spatial-data-lab/knime-geospatial-extension/blob/main/knime_e
 
 import knime.extension as knext
 import pandas as pd
-from datetime import datetime, date, time, timedelta
 from typing import Callable
 import logging
 import numpy as np
@@ -14,21 +13,10 @@ import numpy as np
 LOGGER = logging.getLogger(__name__)
 
 ############################################
-# Date &/or time value types
+# Timestamp column selection helper
 ############################################
 
-TYPE_DATE_TIME = knext.logical(datetime)
-TYPE_DATE = knext.logical(date)
-TYPE_TIME = knext.logical(time)
-TYPE_TIME_DELTA = knext.logical(timedelta)
-
-
-############################################
-# Column selection helper
-############################################
-
-
-# pre-define values factory types
+# Strings of IDs of date/time value factories
 ZONED_DATE_TIME_ZONE_VALUE = "org.knime.core.data.v2.time.ZonedDateTimeValueFactory2"
 LOCAL_TIME_VALUE = "org.knime.core.data.v2.time.LocalTimeValueFactory"
 LOCAL_DATE_VALUE = "org.knime.core.data.v2.time.LocalDateValueFactory"
@@ -40,7 +28,7 @@ DEF_DATE_LABEL = "LocalDateValueFactory"
 DEF_TIME_LABEL = "LocalTimeValueFactory"
 DEF_DATE_TIME_LABEL = "LocalDateTimeValueFactory"
 
-# formats corresponding to timestamp type
+# Timestamp formats
 ZONED_DATE_TIME_FORMAT = "%Y-%m-%d %H:%M:%S%z"
 DATE_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 DATE_FORMAT = "%Y-%m-%d"
@@ -77,7 +65,6 @@ category_analytics = knext.category(
 )
 
 
-# Filter columns visible in the column_param for numeric ones
 def is_numeric(column: knext.Column) -> bool:
     """
     Checks if column is numeric e.g. int, long or double.
@@ -148,25 +135,13 @@ def __is_type_x(column: knext.Column, type: str) -> bool:
     """
     Checks if column contains the given type whereas type can be :
     DateTime, Date, Time, ZonedDateTime
-    @return: True if Column Type is of type timestamp
+    @return: True if column type is of type timestamp
     """
 
     return (
         isinstance(column.ktype, knext.LogicalType)
         and type in column.ktype.logical_type
     )
-
-
-# this method will check the input type for timestamp
-def check_type(column: str, schema: knext.Schema):
-    """
-    This function returns the name of the factory data type for relevant timestamp column.
-    @return: Name of factory data type for timestamp
-    """
-
-    selected_col = schema[column]
-    type_detected = selected_col.ktype.logical_type.split(".")
-    return type_detected[len(type_detected) - 1].replace('"}', "")
 
 
 ############################################
@@ -191,7 +166,7 @@ def extract_zone(value):
     return value.tz
 
 
-def localize_timezone(value, zone):
+def localize_timezone(value: pd.Timestamp, zone) -> pd.Timestamp:
     """
     This function updates the Pandas Timestamp value with the time zone. If "None" is passed timezone will be removed from
     timestamp returning a timezone naive value.
@@ -203,7 +178,7 @@ def localize_timezone(value, zone):
 
 def time_granularity_list() -> list:
     """
-    This function returns list of possible time fields relevant to only Time type values.
+    This function returns list of possible time fields relevant to only time type values.
     @return: list of item fields in Time
     """
     return [
@@ -259,7 +234,7 @@ def extract_time_fields(
 ) -> pd.DataFrame:
     """
     This function exracts the timestamp fields in seperate columns.
-    @return: Pandas datafram with timestamp column and relevant date&time fields.
+    @return: Pandas dataframe with a timestamp column and relevant date&time fields.
     """
 
     cols_cap = [series_name]
@@ -417,7 +392,7 @@ def __check_col_and_type(
 def check_missing_values(column: pd.Series) -> bool:
     """
     This function checks for missing values in the Pandas Series.
-    @return: True is missing values exist in column
+    @return: True if missing values exist in column
     """
     return column.hasnans
 

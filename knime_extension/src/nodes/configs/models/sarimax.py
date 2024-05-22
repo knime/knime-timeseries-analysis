@@ -12,7 +12,6 @@ from util import utils as kutil
 
 @knext.parameter_group(label="Sarimax Model Parameters")
 class SXLearnerParams(_LearnerParams):
-
     """
 
     SARIMAX Learner Parameter class inheriting the private class _LearnerParams above.
@@ -35,7 +34,6 @@ class SXLearnerParams(_LearnerParams):
 
 @knext.parameter_group(label="Sarimax Predictor Parameters")
 class SXPredictorParams(_PredictorParams):
-
     """
 
     SARIMAX Predictor Parameter class inheriting the private class _PredictorParams above.
@@ -58,8 +56,7 @@ class SXPredictorParams(_PredictorParams):
 
 
 @knext.parameter_group(label="Sarimax Forecaster Settings")
-class SarimaxForecasterParms:
-
+class SarimaxForecasterParams:
     """
 
     SARIMAX settings to configure the parameters for the model.

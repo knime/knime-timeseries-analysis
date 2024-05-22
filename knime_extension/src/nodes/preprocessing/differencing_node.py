@@ -41,24 +41,17 @@ class SeasonalDifferencingNode:
             kutil.is_numeric,
         )
 
-        # get the data type of the selected column
+        # get the KNIME data type of the selected column
         ktype = (
             input_schema[[self.diff_params.target_column]].delegate._columns[0].ktype
         )
-
-        return input_schema.append(
-            knext.Column(
-                ktype,
-                self.diff_params.target_column
-                + "("
-                + (str(-self.diff_params.lags))
-                + ")",
-            )
+        differenced_col_name = (
+            self.diff_params.target_column + "(" + (str(-self.diff_params.lags)) + ")"
         )
 
-    def execute(
-        self, exec_context: knext.ExecutionContext, input_table
-    ):  # NOSONAR exec_context is necessary
+        return input_schema.append(knext.Column(ktype, differenced_col_name))
+
+    def execute(self, exec_context: knext.ExecutionContext, input_table):
         df = input_table.to_pandas()
 
         target_col = df[self.diff_params.target_column]
