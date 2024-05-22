@@ -7,7 +7,7 @@ import numpy as np
 from ..configs.preprocessing.aggrgran import (
     AggregationGranularityParams,
 )
-
+#from ..configs.preprocessing.aggrgran.AggregationGranularityParams import AggregationMethods
 LOGGER = logging.getLogger(__name__)
 
 
@@ -62,27 +62,28 @@ class AggregationGranularity:
 
     def __configure_specs(self, input_schema: knext.Schema) -> knext.Schema:
         """
-        This function runs the logic of all possible combinations that can produce output schema containing:
+        This function applys checks on possible combinations that can produce output schema containing:
 
         1) 2 or 3 columns.
-        2) The timestamp data type after performing the aggregation upon the the selected dattime field.
+        2) The timestamp data type after performing the aggregation upon the the selected datetime field.
         3) The possible datatype of the target column (column on which aggregation method is applied). This can be either int64 or double.
         """
-        # initialize the variable that is needed for returning the output schema and get the column names
         output_schema = None
         col_names = input_schema.column_names
+
+        aggreg_params = self.aggreg_params
 
         # get data type of the target column ==> double or int
         input_aggregation_column_ktype = (
             input_schema[:]
-            .delegate._columns[col_names.index(self.aggreg_params.aggregation_column)]
+            .delegate._columns[col_names.index(aggreg_params.aggregation_column)]
             .ktype
         )
 
         # get knime data type of the selected timestamp column
         input_timestamp_ktype = (
             input_schema[:]
-            .delegate._columns[col_names.index(self.aggreg_params.datetime_col)]
+            .delegate._columns[col_names.index(aggreg_params.datetime_col)]
             .ktype
         )
 
@@ -98,14 +99,14 @@ class AggregationGranularity:
 
         if input_aggregation_column_ktype == knext.double():
             if (
-                self.aggreg_params.aggregation_methods
-                != self.aggreg_params.AggregationMethods.COUNT.name
+                aggreg_params.aggregation_methods
+                != aggreg_params.AggregationMethods.COUNT.name
             ):
                 target_column_is_of_type_double = True
         else:
-            if self.aggreg_params.aggregation_methods in [
-                self.aggreg_params.AggregationMethods.MEAN.name,
-                self.aggreg_params.AggregationMethods.VARIANCE.name,
+            if aggreg_params.aggregation_methods in [
+                aggreg_params.AggregationMethods.MEAN.name,
+                aggreg_params.AggregationMethods.VARIANCE.name,
             ]:
                 target_column_is_of_type_double = True
 
@@ -113,11 +114,11 @@ class AggregationGranularity:
         # then the output datatype of timestamp column will always have a timezone.
         contains_timezone = (
             time_stamp_logical_type == kutil.ZONED_DATE_TIME_ZONE_VALUE
-            and self.aggreg_params.time_granularity
+            and aggreg_params.time_granularity
             in [
-                self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                aggreg_params.TimeGranularityOpts.HOUR.name,
+                aggreg_params.TimeGranularityOpts.MINUTE.name,
+                aggreg_params.TimeGranularityOpts.SECOND.name,
             ]
         )
 
@@ -127,11 +128,11 @@ class AggregationGranularity:
             kutil.LOCAL_DATE_TIME_VALUE,
             kutil.LOCAL_TIME_VALUE,
         ] and (
-            self.aggreg_params.time_granularity
+            aggreg_params.time_granularity
             in [
-                self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                aggreg_params.TimeGranularityOpts.HOUR.name,
+                aggreg_params.TimeGranularityOpts.MINUTE.name,
+                aggreg_params.TimeGranularityOpts.SECOND.name,
             ]
         )
 
@@ -145,18 +146,18 @@ class AggregationGranularity:
                 kutil.LOCAL_DATE_TIME_VALUE,
             ]
             and (
-                self.aggreg_params.time_granularity
+                aggreg_params.time_granularity
                 in [
-                    self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                    self.aggreg_params.TimeGranularityOpts.DAY.name,
-                    self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                    self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                    aggreg_params.TimeGranularityOpts.HOUR.name,
+                    aggreg_params.TimeGranularityOpts.DAY.name,
+                    aggreg_params.TimeGranularityOpts.MINUTE.name,
+                    aggreg_params.TimeGranularityOpts.SECOND.name,
                 ]
             )
         ) or (
             time_stamp_logical_type == kutil.LOCAL_DATE_VALUE
-            and self.aggreg_params.time_granularity
-            == self.aggreg_params.TimeGranularityOpts.DAY.name
+            and aggreg_params.time_granularity
+            == aggreg_params.TimeGranularityOpts.DAY.name
         )
 
         # this option toggles the output schema in two scenarios:
@@ -169,14 +170,14 @@ class AggregationGranularity:
         ### one will contain a timestamp column of corresponding timestamp data type.
         ### and target column after the aggregation method is applied.
         if (
-            self.aggreg_params.time_granularity
-            == self.aggreg_params.TimeGranularityOpts.YEAR.name
+            aggreg_params.time_granularity
+            == aggreg_params.TimeGranularityOpts.YEAR.name
         ):
             aggregation_category = AggregationGranularityParams.AggregationCategory.YEAR
-        elif self.aggreg_params.time_granularity in [
-            self.aggreg_params.TimeGranularityOpts.WEEK.name,
-            self.aggreg_params.TimeGranularityOpts.MONTH.name,
-            self.aggreg_params.TimeGranularityOpts.QUARTER.name,
+        elif aggreg_params.time_granularity in [
+            aggreg_params.TimeGranularityOpts.WEEK.name,
+            aggreg_params.TimeGranularityOpts.MONTH.name,
+            aggreg_params.TimeGranularityOpts.QUARTER.name,
         ]:
             aggregation_category = (
                 AggregationGranularityParams.AggregationCategory.WEEK_OR_LONGER
