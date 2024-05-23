@@ -74,7 +74,7 @@ class SarimaForcaster:
         insamp_res_schema = knext.Schema(
             [knext.double(), knext.double()], ["Residuals", "In-Samples"]
         )
-        model_summary_schema = knext.Column(knext.double(), "value")
+        model_summary_schema = knext.Column(knext.double(), "Value")
         binary_model_schema = knext.BinaryPortObjectSpec("sarima.model")
 
         return (
@@ -216,6 +216,6 @@ class SarimaForcaster:
 
         summary = pd.concat(
             [coeff, coeff_errors, log_likelihood, aic, bic, mse, mae]
-        ).rename(columns={0: "value"})
+        ).rename(columns={0: "Value"})
 
         return summary

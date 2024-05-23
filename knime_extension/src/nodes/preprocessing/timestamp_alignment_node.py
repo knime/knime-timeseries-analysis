@@ -49,7 +49,9 @@ class TimestampAlignmentNode:
         date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[0].ktype
 
         if not self.params.replace_original:
-            datetime_index = input_schema.column_names.index(self.params.datetime_col)
+            datetime_index = (
+                input_schema.column_names.index(self.params.datetime_col) + 1
+            )
             input_schema = input_schema.insert(
                 knext.Column(
                     date_ktype,
@@ -59,7 +61,7 @@ class TimestampAlignmentNode:
             )
         return input_schema
 
-    def execute(self, exec_context: knext.ExecutionContext, input_table):
+    def execute(self, exec_context: knext.ExecutionContext, input_table: knext.Table):
         df = input_table.to_pandas()
         datetime_col = df[self.params.datetime_col]
         timestamp_value_factory_class_string = kutil.get_type_timestamp(
@@ -98,12 +100,10 @@ class TimestampAlignmentNode:
         df_time = self.__modify_time(
             timestamp_value_factory_class_string, df_time, zone_offset
         )
-
-        df = df.drop(
-            columns=[self.params.datetime_col]
-        )  # TODO necessary? seems like 4 lines later it is overwritten anyways
-
         exec_context.set_progress(0.4)
+
+        # Necessary to avoid new suffixes on datetime_col in the df_time.merge step afterwards
+        df = df.drop(columns=[self.params.datetime_col])
 
         df = (
             df_time.merge(df, how="left", left_index=True, right_index=True)
@@ -111,7 +111,6 @@ class TimestampAlignmentNode:
             .sort_values(self.params.datetime_col + NEW_COLUMN)
             .reset_index(drop=True)
         )
-
         exec_context.set_progress(0.7)
 
         if self.params.replace_original:
@@ -130,30 +129,29 @@ class TimestampAlignmentNode:
         """
         This function is where the date column is processed to fill in for missing time stamp values
         """
-        df = df_time.copy()  # TODO Is this necessary?
 
-        start = df[self.params.datetime_col].astype(str).min()
-        end = df[self.params.datetime_col].astype(str).max()
+        start = df_time[self.params.datetime_col].astype(str).min()
+        end = df_time[self.params.datetime_col].astype(str).max()
         frequency = self.params.TimeFrequency[self.params.period].value[1]
 
         timestamps = pd.date_range(start=start, end=end, freq=frequency)
 
         if kn_date_format == kutil.DEF_TIME_LABEL:
             timestamps = pd.Series(timestamps.time)
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_LABEL:
             timestamps = pd.to_datetime(pd.Series(timestamps), format=kutil.DATE_FORMAT)
             timestamps = timestamps.dt.date
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_TIME_LABEL:
             timestamps = pd.to_datetime(
                 pd.Series(timestamps), format=kutil.DATE_TIME_FORMAT
             )
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_ZONED_DATE_LABEL:
             unique_tz = pd.unique(tz.astype(str))
@@ -165,7 +163,7 @@ class TimestampAlignmentNode:
                     "Selected date&time column contains multiple zones."
                 )
             else:
-                modified_dates = self.__align_time(timestamps=timestamps, df=df)
+                modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
                     modified_dates[column] = modified_dates[column].dt.tz_localize(
                         tz[0]
@@ -184,9 +182,10 @@ class TimestampAlignmentNode:
             set(timestamps).difference(df[self.params.datetime_col]),
             columns=[self.params.datetime_col + __duplicate],
         )
+
         df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)
 
-        # concatenate difference timestamps with input timestamps
+        # concatenate differenced timestamps with input timestamps
         df3 = pd.DataFrame(
             pd.concat(
                 [
@@ -200,6 +199,7 @@ class TimestampAlignmentNode:
         final_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
         )
+
         return final_df[
             [
                 self.params.datetime_col,

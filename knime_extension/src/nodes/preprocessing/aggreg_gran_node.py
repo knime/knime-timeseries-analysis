@@ -217,11 +217,13 @@ class AggregationGranularity:
 
         return knext.Schema(data_types, column_names)
 
-    def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Schema):
+    def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Table):
         df = input_1.to_pandas()
 
-        date_time_col_orig = df[self.aggreg_params.datetime_col]
-        agg_col = df[self.aggreg_params.aggregation_column]
+        params = self.aggreg_params
+
+        date_time_col_orig = df[params.datetime_col]
+        agg_col = df[params.aggregation_column]
 
         # Cast agg_col always to long to avoid casting issues
         if pd.api.types.is_integer_dtype(agg_col):
@@ -244,8 +246,8 @@ class AggregationGranularity:
             date_time_col, kn_date_time_format, str(date_time_col.name)
         )
 
-        time_granularity = self.aggreg_params.time_granularity.capitalize()
-        aggreg_method = self.aggreg_params.aggregation_methods
+        time_granularity = params.time_granularity.capitalize()
+        aggreg_method = params.aggregation_methods
 
         if time_granularity not in df_time.columns:
             raise knext.InvalidParametersError(
@@ -253,44 +255,34 @@ class AggregationGranularity:
             )
         exec_context.set_progress(0.6)
 
-        df_time_updated = self.__modify_time(
-            time_granularity, kn_date_time_format, df_time
-        )
+        df_time = self.__modify_time(time_granularity, kn_date_time_format, df_time)
 
         exec_context.set_progress(0.7)
 
         if (kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL) and (
             time_granularity in kutil.time_granularity_list()
         ):
-            df_time_updated = self.__append_time_zone(df_time_updated, zone_offset)
+            df_time = self.__append_time_zone(df_time, zone_offset)
 
-        df_grouped = self.__aggregate(
-            df_time_updated, agg_col, time_granularity, aggreg_method
-        )
+        df_grouped = self.__aggregate(df_time, agg_col, time_granularity, aggreg_method)
 
-        if pd.api.types.is_integer_dtype(
-            df_grouped[self.aggreg_params.aggregation_column]
-        ):
-            df_grouped[self.aggreg_params.aggregation_column] = df_grouped[
-                self.aggreg_params.aggregation_column
+        if pd.api.types.is_integer_dtype(df_grouped[params.aggregation_column]):
+            df_grouped[params.aggregation_column] = df_grouped[
+                params.aggregation_column
             ].astype(np.int64)
 
         exec_context.set_progress(0.8)
         if time_granularity not in (
-            self.aggreg_params.TimeGranularityOpts.QUARTER.name.capitalize(),
-            self.aggreg_params.TimeGranularityOpts.MONTH.name.capitalize(),
-            self.aggreg_params.TimeGranularityOpts.WEEK.name.capitalize(),
+            params.TimeGranularityOpts.QUARTER.name.capitalize(),
+            params.TimeGranularityOpts.MONTH.name.capitalize(),
+            params.TimeGranularityOpts.WEEK.name.capitalize(),
         ):
-            df_grouped = df_grouped[
-                [self.aggreg_params.datetime_col, self.aggreg_params.aggregation_column]
-            ]
+            df_grouped = df_grouped[[params.datetime_col, params.aggregation_column]]
         exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(df_grouped)
 
-    def __modify_time(
-        self, time_gran: str, kn_date_time_type: str, df: pd.DataFrame
-    ):  # TODO df copy deleted, is that alright?
+    def __modify_time(self, time_gran: str, kn_date_time_type: str, df: pd.DataFrame):
         """
         This function modifies the input timestamp column according to the type of granularity selected. For instance, if the selected time granularity is "Quarter" then
         the next higher time value against quarter will be "Year". Hence only "Year" will be returned.
@@ -402,7 +394,7 @@ class AggregationGranularity:
         """
         This function re-assignes time zones to date&time column. This function is only called if input date&time column containes time zone.
         """
-
+        # TODO Find faster approach # NOSONAR not urgent
         date_col_internal = date_col
         for i in range(0, len(zoned.index)):
             date_col_internal[self.aggreg_params.datetime_col][i] = date_col_internal[
