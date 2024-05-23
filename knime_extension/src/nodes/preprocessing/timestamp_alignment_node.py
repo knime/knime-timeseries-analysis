@@ -34,109 +34,93 @@ class TimestampAlignmentNode:
     This node preserves duplicated values and possibly lead to cluttered output. Therefore, in case of duplicated timestamps, we encourage using *Date&Time Aggregator* node before using this node.
     """
 
-    ts_align_params = TimeStampAlignmentParams()
+    params = TimeStampAlignmentParams()
 
     def configure(
         self, configure_context: knext.ConfigurationContext, input_schema: knext.Schema
     ):
-        self.ts_align_params.datetime_col = kutil.column_exists_or_preset(
+        self.params.datetime_col = kutil.column_exists_or_preset(
             configure_context,
-            self.ts_align_params.datetime_col,
+            self.params.datetime_col,
             input_schema,
             kutil.is_type_timestamp,
         )
 
-        date_ktype = (
-            input_schema[[self.ts_align_params.datetime_col]].delegate._columns[0].ktype
-        )
+        date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[0].ktype
 
-        # Need index of input col
-        index = 0
-        for _ in input_schema:
-            if input_schema.column_names[index] != self.ts_align_params.datetime_col:
-                continue
-            index = index + 1
-        # if option is checked, insert new column in the index next to the selected column
-        if not self.ts_align_params.replace_original:
-            return input_schema.insert(
+        if not self.params.replace_original:
+            datetime_index = (
+                input_schema.column_names.index(self.params.datetime_col) + 1
+            )
+            input_schema = input_schema.insert(
                 knext.Column(
                     date_ktype,
-                    self.ts_align_params.datetime_col + NEW_COLUMN,
+                    self.params.datetime_col + NEW_COLUMN,
                 ),
-                index,
+                datetime_index,
             )
-        else:
-            return input_schema
+        return input_schema
 
-    def execute(self, exec_context: knext.ExecutionContext, input_table):
+    def execute(self, exec_context: knext.ExecutionContext, input_table: knext.Table):
         df = input_table.to_pandas()
-
-        # select timestamp column
-        date_time_col_orig = df[self.ts_align_params.datetime_col]
-
-        # get factory type of the timestamp
-        kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
-
+        datetime_col = df[self.params.datetime_col]
+        timestamp_value_factory_class_string = kutil.get_type_timestamp(
+            str(datetime_col.dtype)
+        )
+        selected_period = self.params.period.capitalize()
         exec_context.set_progress(0.2)
 
-        # if condition to handle zoned date&time
-        if kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL:
-            a = kutil.cast_to_related_type(kn_date_time_format, date_time_col_orig)
-
-            date_time_col, kn_date_time_format, zone_offset = a[0], a[1], a[2]
+        zone_offset = None
+        if timestamp_value_factory_class_string == kutil.DEF_ZONED_DATE_LABEL:
+            a = kutil.cast_to_related_type(
+                timestamp_value_factory_class_string, datetime_col
+            )
+            date_time_col, timestamp_value_factory_class_string, zone_offset = (
+                a[0],
+                a[1],
+                a[2],
+            )
 
         else:
-            # returns series of date time according to the date format and knime supported data type
-            a = kutil.cast_to_related_type(kn_date_time_format, date_time_col_orig)
-
-            # handle multiple iterable error. This is done to handle dynamic assignment of variables incase zoned date and time type is encountered
-            date_time_col, kn_date_time_format = a[0], a[1]
-
-        # this variable is assigned to the period selected by the user
-        selected_period = self.ts_align_params.period.capitalize()
-
+            a = kutil.cast_to_related_type(
+                timestamp_value_factory_class_string, datetime_col
+            )
+            date_time_col, timestamp_value_factory_class_string = a[0], a[1]
         exec_context.set_progress(0.3)
-        # extract date&time fields from the input timestamp column
+
         df_time = kutil.extract_time_fields(
-            date_time_col, kn_date_time_format, str(date_time_col.name)
+            date_time_col, timestamp_value_factory_class_string, str(date_time_col.name)
         )
 
-        # raise exception if selected period does not exists in the input timestamp column
         if selected_period not in df_time.columns:
             raise knext.InvalidParametersError(
                 f"""Input timestamp column cannot resample on {selected_period} field. Please change timestamp data type and try again."""
             )
 
-        # check to work on timezone otherwise proceed normally
-        if kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL:
-            df_time_updated = self.__modify_time(
-                kn_date_time_format, df_time, tz=zone_offset
-            )
-        else:
-            df_time_updated = self.__modify_time(kn_date_time_format, df_time)
-
-        df = df.drop(columns=[self.ts_align_params.datetime_col])
-
+        df_time = self.__modify_time(
+            timestamp_value_factory_class_string, df_time, zone_offset
+        )
         exec_context.set_progress(0.4)
 
+        # Necessary to avoid new suffixes on datetime_col in the df_time.merge step afterwards
+        df = df.drop(columns=[self.params.datetime_col])
+
         df = (
-            df_time_updated.merge(df, how="left", left_index=True, right_index=True)
+            df_time.merge(df, how="left", left_index=True, right_index=True)
             .reset_index(drop=True)
-            .sort_values(self.ts_align_params.datetime_col + NEW_COLUMN)
+            .sort_values(self.params.datetime_col + NEW_COLUMN)
             .reset_index(drop=True)
         )
-
         exec_context.set_progress(0.7)
 
-        if self.ts_align_params.replace_original:
-            df = df.drop(columns=[self.ts_align_params.datetime_col]).rename(
+        if self.params.replace_original:
+            df = df.drop(columns=[self.params.datetime_col]).rename(
                 columns={
-                    self.ts_align_params.datetime_col
-                    + NEW_COLUMN: self.ts_align_params.datetime_col
+                    self.params.datetime_col + NEW_COLUMN: self.params.datetime_col
                 }
             )
-
         exec_context.set_progress(0.9)
+
         return knext.Table.from_pandas(df)
 
     def __modify_time(
@@ -145,32 +129,29 @@ class TimestampAlignmentNode:
         """
         This function is where the date column is processed to fill in for missing time stamp values
         """
-        df = df_time.copy()
 
-        start = df[self.ts_align_params.datetime_col].astype(str).min()
-        end = df[self.ts_align_params.datetime_col].astype(str).max()
-        frequency = self.ts_align_params.TimeFrequency[
-            self.ts_align_params.period
-        ].value[1]
+        start = df_time[self.params.datetime_col].astype(str).min()
+        end = df_time[self.params.datetime_col].astype(str).max()
+        frequency = self.params.TimeFrequency[self.params.period].value[1]
 
         timestamps = pd.date_range(start=start, end=end, freq=frequency)
 
         if kn_date_format == kutil.DEF_TIME_LABEL:
             timestamps = pd.Series(timestamps.time)
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_LABEL:
             timestamps = pd.to_datetime(pd.Series(timestamps), format=kutil.DATE_FORMAT)
             timestamps = timestamps.dt.date
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_TIME_LABEL:
             timestamps = pd.to_datetime(
                 pd.Series(timestamps), format=kutil.DATE_TIME_FORMAT
             )
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df)
+            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_ZONED_DATE_LABEL:
             unique_tz = pd.unique(tz.astype(str))
@@ -182,7 +163,7 @@ class TimestampAlignmentNode:
                     "Selected date&time column contains multiple zones."
                 )
             else:
-                modified_dates = self.__align_time(timestamps=timestamps, df=df)
+                modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
                     modified_dates[column] = modified_dates[column].dt.tz_localize(
                         tz[0]
@@ -198,30 +179,30 @@ class TimestampAlignmentNode:
 
         # find set difference from available timestamps and missing timestamps
         df2 = pd.DataFrame(
-            set(timestamps).difference(df[self.ts_align_params.datetime_col]),
-            columns=[self.ts_align_params.datetime_col + __duplicate],
+            set(timestamps).difference(df[self.params.datetime_col]),
+            columns=[self.params.datetime_col + __duplicate],
         )
-        df2 = df2.set_index(self.ts_align_params.datetime_col + __duplicate, drop=False)
 
-        # concatenate difference timestamps with input timestamps
+        df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)
+
+        # concatenate differenced timestamps with input timestamps
         df3 = pd.DataFrame(
             pd.concat(
                 [
-                    df[self.ts_align_params.datetime_col],
-                    df2[self.ts_align_params.datetime_col + __duplicate],
+                    df[self.params.datetime_col],
+                    df2[self.params.datetime_col + __duplicate],
                 ]
             )
-        ).rename(columns={0: self.ts_align_params.datetime_col + NEW_COLUMN})
+        ).rename(columns={0: self.params.datetime_col + NEW_COLUMN})
 
         # do a left join and return only the actual time input and updated timestamp column
-        new_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
+        final_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
         )
-        new_df = new_df[
+
+        return final_df[
             [
-                self.ts_align_params.datetime_col,
-                self.ts_align_params.datetime_col + NEW_COLUMN,
+                self.params.datetime_col,
+                self.params.datetime_col + NEW_COLUMN,
             ]
         ]
-
-        return new_df

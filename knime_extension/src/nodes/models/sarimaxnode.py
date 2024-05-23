@@ -1,7 +1,7 @@
 import logging
 import knime.extension as knext
 from util import utils as kutil
-from ..configs.models.sarimax import SarimaxForecasterParms
+from ..configs.models.sarimax import SarimaxForecasterParams
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -27,14 +27,14 @@ LOGGER = logging.getLogger(__name__)
 )
 @knext.output_table(
     name="Forecast",
-    description="Table containing forecasts for the configured column, the first value will be 1 timestamp ahead of the final training value used. ",
+    description="Table containing forecasts for the configured column, the first value will be one timestamp ahead of the final training value used. ",
 )
 @knext.output_table(
     name="In-sample & Residuals",
     description="In sample model prediction values and residuals i.e. difference between observed value and the predicted output.",
 )
 @knext.output_table(
-    name="Model Summary",
+    name="Coefficients and Statistics",
     description="Table containing fitted model coefficients, variance of residuals (sigma2), and several model metrics along with their standard errors.",
 )
 @knext.output_binary(
@@ -58,7 +58,7 @@ class SXForecaster:
     Ensure that neither of the selected columns in the node configuration dialogue must contain a missing value.
     """
 
-    sarimax_params = SarimaxForecasterParms()
+    sarimax_params = SarimaxForecasterParams()
 
     def configure(
         self,
@@ -96,7 +96,7 @@ class SXForecaster:
         insamp_res_schema = knext.Schema(
             [knext.double(), knext.double()], ["Residuals", "In-Samples"]
         )
-        model_summary_schema = knext.Column(knext.double(), "value")
+        model_summary_schema = knext.Column(knext.double(), "Value")
         binary_model_schema = knext.BinaryPortObjectSpec("sarimax.model")
 
         return (
@@ -109,106 +109,88 @@ class SXForecaster:
     def execute(self, exec_context: knext.ExecutionContext, input_1, input_2):
         df = input_1.to_pandas()
         exog_df = input_2.to_pandas()
+        params = self.sarimax_params
 
-        exog_var = df[self.sarimax_params.learner_params.exog_column]
-
-        exog_var_forecasts = exog_df[
-            self.sarimax_params.predictor_params.exog_column_forecasts
-        ]
-
-        regression_target = df[self.sarimax_params.input_column]
-
+        exog_col = df[params.learner_params.exog_column]
+        exog_forecasts_col = exog_df[params.predictor_params.exog_column_forecasts]
+        target_col = df[params.input_column]
         exec_context.set_progress(0.1)
 
-        self._exec_validate(regression_target, exog_var, exog_var_forecasts)
+        self.__validate(target_col, exog_col, exog_forecasts_col)
 
         # model initialization and training
         model = SARIMAX(
-            regression_target,
+            target_col,
             order=(
-                self.sarimax_params.learner_params.ar_order_param,
-                self.sarimax_params.learner_params.i_order_param,
-                self.sarimax_params.learner_params.ma_order_param,
+                params.learner_params.ar_order_param,
+                params.learner_params.i_order_param,
+                params.learner_params.ma_order_param,
             ),
             seasonal_order=(
-                self.sarimax_params.learner_params.seasoanal_ar_order_param,
-                self.sarimax_params.learner_params.seasoanal_i_order_param,
-                self.sarimax_params.learner_params.seasoanal_ma_order_param,
-                self.sarimax_params.learner_params.seasonal_period_param,
+                params.learner_params.seasoanal_ar_order_param,
+                params.learner_params.seasoanal_i_order_param,
+                params.learner_params.seasoanal_ma_order_param,
+                params.learner_params.seasonal_period_param,
             ),
-            exog=exog_var,
+            exog=exog_col,
         )
-        # maxiters set to default
-        model_fit = model.fit()
-
+        trained_model = model.fit()
         exec_context.set_progress(0.5)
 
-        residuals = model_fit.resid
-
-        # in-samples
         in_samples = pd.Series(dtype=np.float64)
-
-        preds_col = model_fit.predict(
-            start=1, dynamic=self.sarimax_params.predictor_params.dynamic_check
+        preds_col = trained_model.predict(
+            start=1, dynamic=params.predictor_params.dynamic_check
         )
         in_samples = pd.concat([in_samples, preds_col])
 
-        # check if log transformation is enabled
-        if self.sarimax_params.learner_params.natural_log:
-            val = kutil.check_negative_values(regression_target)
-
-            # raise error if target column contains negative values
-            if val > 0:
+        if params.learner_params.natural_log:
+            num_negative_vals = kutil.check_negative_values(target_col)
+            if num_negative_vals > 0:
                 raise knext.InvalidParametersError(
-                    f" There are '{val}' non-positive values in the target column."
+                    f" There are '{num_negative_vals}' non-positive values in the target column."
                 )
-
-            regression_target = np.log(regression_target)
-
+            target_col = np.log(target_col)
         exec_context.set_progress(0.6)
 
-        # combine residuals and is-samples to as part of one dataframe
-        in_samps_residuals = pd.concat([residuals, in_samples], axis=1)
+        # combine residuals and is-samples
+        in_samps_residuals = pd.concat([trained_model.resid, in_samples], axis=1)
         in_samps_residuals.columns = ["Residuals", "In-Samples"]
 
         # reverse log transformation for in-sample values
-        if self.sarimax_params.learner_params.natural_log:
+        if params.learner_params.natural_log:
             in_samples = np.exp(in_samples)
 
         # make out-of-sample forecasts
-        forecasts = model_fit.forecast(
-            steps=self.sarimax_params.predictor_params.number_of_forecasts,
-            exog=exog_var_forecasts,
+        forecasts = trained_model.forecast(
+            steps=params.predictor_params.number_of_forecasts,
+            exog=exog_forecasts_col,
         ).to_frame(name="Forecasts")
 
         # reverse log transformation for forecasts
-        if self.sarimax_params.learner_params.natural_log:
+        if params.learner_params.natural_log:
             forecasts = np.exp(forecasts)
 
         exec_context.set_progress(0.8)
 
         # populate model coefficients
-        model_summary = self.model_summary(model_fit)
+        coeffs_and_stats = self.get_coeffs_and_stats(trained_model)
 
-        model_binary = pickle.dumps(model_fit)
-
+        model_binary = pickle.dumps(trained_model)
 
         exec_context.set_progress(0.9)
 
         return (
             knext.Table.from_pandas(forecasts),
             knext.Table.from_pandas(in_samps_residuals),
-            knext.Table.from_pandas(model_summary),
+            knext.Table.from_pandas(coeffs_and_stats),
             model_binary,
         )
 
-    # function to perform validation on dataframe within execution context
-    def _exec_validate(self, target, exog_train, exog_forecast):
+    def __validate(self, target, exog_train, exog_forecast):
         ########################################################
         # TARGET COLUMN CHECK
         ########################################################
 
-        # check for missing values first
         if kutil.check_missing_values(target):
             missing_count = kutil.count_missing_values(target)
             raise knext.InvalidParametersError(
@@ -230,9 +212,7 @@ class SXForecaster:
                 * self.sarimax_params.learner_params.seasoanal_ma_order_param,
             ]
         )
-
         num_of_rows = kutil.number_of_rows(target)
-
         if num_of_rows < max(set_val):
             raise knext.InvalidParametersError(
                 f"""Number of rows must be greater than maximum lag: "{max(set_val)}" to train the model. The maximum lag is the max of p, q, s*P, and s*Q."""
@@ -242,14 +222,12 @@ class SXForecaster:
         # EXOGENOUS COLUMN CHECK
         ########################################################
 
-        # check for missing values first
         if kutil.check_missing_values(exog_train):
             missing_count_exog = kutil.count_missing_values(exog_train)
             raise knext.InvalidParametersError(
                 f"""There are {missing_count_exog} missing values in the exogenous column selected for training."""
             )
 
-        # Length of target column and exogenous column must be the same
         if kutil.number_of_rows(exog_train) != kutil.number_of_rows(target):
             raise knext.InvalidParametersError(
                 "Length of target column and exogenous column should be the same."
@@ -259,14 +237,12 @@ class SXForecaster:
         # EXOGENOUS FORECASTS COLUMN CHECK
         ########################################################
 
-        # check for missing values first
         if kutil.check_missing_values(exog_forecast):
             missing_count_exog_fore = kutil.count_missing_values(exog_forecast)
             raise knext.InvalidParametersError(
                 f"""There are {missing_count_exog_fore} missing values in the exogenous column selected for forecasting."""
             )
 
-        # check that the number of rows for exogenous input relating to forecasts and number of forecasts to be made should be equal
         if (
             kutil.number_of_rows(exog_forecast)
             != self.sarimax_params.predictor_params.number_of_forecasts
@@ -275,7 +251,7 @@ class SXForecaster:
                 "The number of forecasts should be equal to the number of rows in the exogenous input for forecasts."
             )
 
-    def model_summary(self, model):
+    def get_coeffs_and_stats(self, model):
         # estimates of the parameter coefficients
         coeff = model.params.to_frame()
 
@@ -303,6 +279,6 @@ class SXForecaster:
 
         summary = pd.concat(
             [coeff, coeff_errors, log_likelihood, aic, bic, mse, mae]
-        ).rename(columns={0: "value"})
+        ).rename(columns={0: "Value"})
 
         return summary

@@ -1,7 +1,7 @@
 import logging
 import knime.extension as knext
 from util import utils as kutil
-from ..configs.models.sarima import SarimaForecasterParms
+from ..configs.models.sarima import SarimaForecasterParams
 import pandas as pd
 import numpy as np
 from statsmodels.tsa.statespace.sarimax import SARIMAX
@@ -51,14 +51,14 @@ class SarimaForcaster:
     *Seasonal versions of these components operate similarly, with lag intervals equal to the seasonal period (S).*
     """
 
-    sarima_params = SarimaForecasterParms()
+    sarima_params = SarimaForecasterParams()
 
     # merge in-samples and residuals (In-Samples & Residuals)
-    def configure(self, configure_context, input_schema_1):
+    def configure(self, configure_context, input_schema):
         self.sarima_params.input_column = kutil.column_exists_or_preset(
             configure_context,
             self.sarima_params.input_column,
-            input_schema_1,
+            input_schema,
             kutil.is_numeric,
         )
 
@@ -74,7 +74,7 @@ class SarimaForcaster:
         insamp_res_schema = knext.Schema(
             [knext.double(), knext.double()], ["Residuals", "In-Samples"]
         )
-        model_summary_schema = knext.Column(knext.double(), "value")
+        model_summary_schema = knext.Column(knext.double(), "Value")
         binary_model_schema = knext.BinaryPortObjectSpec("sarima.model")
 
         return (
@@ -84,31 +84,29 @@ class SarimaForcaster:
             binary_model_schema,
         )
 
-    def execute(self, exec_context: knext.ExecutionContext, input_1):
-        df = input_1.to_pandas()
-        regression_target = df[self.sarima_params.input_column]
+    def execute(self, exec_context: knext.ExecutionContext, input: knext.Table):
+        df: pd.DataFrame
+        df = input.to_pandas()
+        target_col: pd.Series
+        target_col = df[self.sarima_params.input_column]
 
         # check if log transformation is enabled
         if self.sarima_params.learner_params.natural_log:
-            val = kutil.count_negative_values(regression_target)
+            num_negative_vals = kutil.count_negative_values(target_col)
 
-            # raise error if target column contains negative values
-            if val > 0:
+            if num_negative_vals > 0:
                 raise knext.InvalidParametersError(
-                    f" There are '{val}' non-positive values in the target column."
+                    f" There are '{num_negative_vals}' non-positive values in the target column."
                 )
-
-            regression_target = np.log(regression_target)
-
+            target_col = np.log(target_col)
         exec_context.set_progress(0.1)
 
-        # validate if target variable has any missing values or not
-        self._exec_validate(regression_target)
-
+        self.__validate(target_col)
         exec_context.set_progress(0.3)
+
         # model initialization and training
         model = SARIMAX(
-            regression_target,
+            target_col,
             order=(
                 self.sarima_params.learner_params.ar_order_param,
                 self.sarima_params.learner_params.i_order_param,
@@ -121,19 +119,13 @@ class SarimaForcaster:
                 self.sarima_params.learner_params.seasonal_period_param,
             ),
         )
-
         exec_context.set_progress(0.5)
-
-        model_fit = model.fit()
-
+        trained_model = model.fit()
         exec_context.set_progress(0.8)
-        # produce residuals
-        residuals = model_fit.resid
 
-        # in-samples
         in_samples = pd.Series(dtype=np.float64)
 
-        preds_col = model_fit.predict(
+        preds_col = trained_model.predict(
             start=1, dynamic=self.sarima_params.predictor_params.dynamic_check
         )
         in_samples = pd.concat([in_samples, preds_col])
@@ -142,12 +134,12 @@ class SarimaForcaster:
         if self.sarima_params.learner_params.natural_log:
             in_samples = np.exp(in_samples)
 
-        # combine residuals and is-samples to as part of one dataframe
-        in_samps_residuals = pd.concat([residuals, in_samples], axis=1)
+        # combine residuals and in-samples
+        in_samps_residuals = pd.concat([trained_model.resid, in_samples], axis=1)
         in_samps_residuals.columns = ["Residuals", "In-Samples"]
 
         # make out-of-sample forecasts
-        forecasts = model_fit.forecast(
+        forecasts = trained_model.forecast(
             steps=self.sarima_params.predictor_params.number_of_forecasts
         ).to_frame(name="Forecasts")
 
@@ -156,22 +148,19 @@ class SarimaForcaster:
             forecasts = np.exp(forecasts)
 
         # populate model coefficients
-        model_summary = self.model_summary(model_fit)
+        coeffs_and_stats = self.get_coeffs_and_stats(trained_model)
 
-        # create model pickle
-        model_binary = pickle.dumps(model_fit)
+        model_binary = pickle.dumps(trained_model)
 
         exec_context.set_progress(0.9)
         return (
             knext.Table.from_pandas(forecasts),
             knext.Table.from_pandas(in_samps_residuals),
-            knext.Table.from_pandas(model_summary),
+            knext.Table.from_pandas(coeffs_and_stats),
             model_binary,
         )
 
-    # function to perform validation on dataframe within execution context
-    def _exec_validate(self, column):
-        # check for missing values first
+    def __validate(self, column):
         if kutil.check_missing_values(column):
             missing_count = kutil.count_missing_values(column)
             raise knext.InvalidParametersError(
@@ -193,15 +182,13 @@ class SarimaForcaster:
                 * self.sarima_params.learner_params.seasoanal_ma_order_param,
             ]
         )
-
         num_of_rows = kutil.number_of_rows(column)
-
         if num_of_rows < max(set_val):
             raise knext.InvalidParametersError(
-                f"""Number of rows must be greater than maximum lag: "{max(set_val)}" to train the model. The maximum lag is the max of p, q, s*P, and s*Q."""
+                f"Number of rows must be greater than maximum lag: '{max(set_val)}' to train the model. The maximum lag is the max of p, q, s*P, and s*Q."
             )
 
-    def model_summary(self, model):
+    def get_coeffs_and_stats(self, model):
         # estimates of the parameter coefficients
         coeff = model.params.to_frame()
 
@@ -229,6 +216,6 @@ class SarimaForcaster:
 
         summary = pd.concat(
             [coeff, coeff_errors, log_likelihood, aic, bic, mse, mae]
-        ).rename(columns={0: "value"})
+        ).rename(columns={0: "Value"})
 
         return summary

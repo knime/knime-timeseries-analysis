@@ -62,101 +62,86 @@ class AggregationGranularity:
 
     def __configure_specs(self, input_schema: knext.Schema) -> knext.Schema:
         """
-        This function runs the logic of all possible combinations that can produce output schema containing:
+        The following scenarios affect the output schema and the specs are then configured:
 
-        1) 2 or 3 columns.
-        2) The timestamp data type after performing the aggregation upon the the selected dattime field.
-        3) The possible datatype of the target column (column on which aggregation method is applied). This can be either int64 or double.
+        | Scenario                                                   | -> Influence on output schema/specs
+        | :--------------------------------------------------------- | :--------------------------------------------------
+        | Granularity is week, month, or quarter                     | -> Additional column introduced
+        | Input timestamp data type and granularity                  | -> Defines output timestamp data type
+        | Numerical input target data type and aggregation method    | -> Defines data type of the numerical output target
         """
-        # initialize the variable that is needed for returning the output schema and get the column names
-        output_schema = None
+        params = self.aggreg_params
         col_names = input_schema.column_names
 
-        # get data type of the target column ==> double or int
         input_aggregation_column_ktype = (
             input_schema[:]
-            .delegate._columns[col_names.index(self.aggreg_params.aggregation_column)]
+            .delegate._columns[col_names.index(params.aggregation_column)]
             .ktype
         )
 
-        # get knime data type of the selected timestamp column
         input_timestamp_ktype = (
             input_schema[:]
-            .delegate._columns[col_names.index(self.aggreg_params.datetime_col)]
+            .delegate._columns[col_names.index(params.datetime_col)]
             .ktype
         )
 
-        # get the value factory string of the respective datetime type;
-        # eg. ZonedDateTimeValueFactory2, LocalDateTimeValueFactory, LocalDateValueFactory and LocalTimeValueFactory
-        time_stamp_logical_type = json.loads(input_timestamp_ktype.logical_type).get(
-            "value_factory_class"
-        )
+        timestamp_value_factory_class_string = json.loads(
+            input_timestamp_ktype.logical_type
+        ).get("value_factory_class")
 
-        # this variable decides if the target column will be a double or an int64.
-        # Unless the selected method is not Count then the output can be a double or int64 based on the data type of input target column.
         target_column_is_of_type_double = False
 
         if input_aggregation_column_ktype == knext.double():
-            if (
-                self.aggreg_params.aggregation_methods
-                != self.aggreg_params.AggregationMethods.COUNT.name
-            ):
+            if params.aggregation_methods != params.AggregationMethods.COUNT.name:
                 target_column_is_of_type_double = True
         else:
-            if self.aggreg_params.aggregation_methods in [
-                self.aggreg_params.AggregationMethods.MEAN.name,
-                self.aggreg_params.AggregationMethods.VARIANCE.name,
+            if params.aggregation_methods in [
+                params.AggregationMethods.MEAN.name,
+                params.AggregationMethods.VARIANCE.name,
             ]:
                 target_column_is_of_type_double = True
 
-        # only if the input timestamp data type is of type Zoned Date&Time and the selected time granularity is in hours, minutes and seconds
-        # then the output datatype of timestamp column will always have a timezone.
         contains_timezone = (
-            time_stamp_logical_type == kutil.ZONED_DATE_TIME_ZONE_VALUE
-            and self.aggreg_params.time_granularity
+            timestamp_value_factory_class_string == kutil.ZONED_DATE_TIME_ZONE_VALUE
+            and params.time_granularity
             in [
-                self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                params.TimeGranularityOpts.HOUR.name,
+                params.TimeGranularityOpts.MINUTE.name,
+                params.TimeGranularityOpts.SECOND.name,
             ]
         )
 
-        # if the input timestamp data type contains a time value, AND IF upon the selected aggregation of time granularity is in hour, minutes or seconds, then only the output will contain a time.
-        contains_time = time_stamp_logical_type in [
+        contains_time = timestamp_value_factory_class_string in [
             kutil.ZONED_DATE_TIME_ZONE_VALUE,
             kutil.LOCAL_DATE_TIME_VALUE,
             kutil.LOCAL_TIME_VALUE,
         ] and (
-            self.aggreg_params.time_granularity
+            params.time_granularity
             in [
-                self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                params.TimeGranularityOpts.HOUR.name,
+                params.TimeGranularityOpts.MINUTE.name,
+                params.TimeGranularityOpts.SECOND.name,
             ]
         )
 
-        # the boolean flag for this field is decided in two ways:
-        ## if the input timestamp data type contains a date AND if the time granularity is in Hour, Day, Minute or Seconds, then the output data type of timestamp column will contain a date.
-        ## if the input timestamp data type is of type DATE and the selected time granularity is in Day then the output timestamp data type will always contain a date.
         contains_date = (
-            time_stamp_logical_type
+            timestamp_value_factory_class_string
             in [
                 kutil.ZONED_DATE_TIME_ZONE_VALUE,
                 kutil.LOCAL_DATE_TIME_VALUE,
             ]
             and (
-                self.aggreg_params.time_granularity
+                params.time_granularity
                 in [
-                    self.aggreg_params.TimeGranularityOpts.HOUR.name,
-                    self.aggreg_params.TimeGranularityOpts.DAY.name,
-                    self.aggreg_params.TimeGranularityOpts.MINUTE.name,
-                    self.aggreg_params.TimeGranularityOpts.SECOND.name,
+                    params.TimeGranularityOpts.HOUR.name,
+                    params.TimeGranularityOpts.DAY.name,
+                    params.TimeGranularityOpts.MINUTE.name,
+                    params.TimeGranularityOpts.SECOND.name,
                 ]
             )
         ) or (
-            time_stamp_logical_type == kutil.LOCAL_DATE_VALUE
-            and self.aggreg_params.time_granularity
-            == self.aggreg_params.TimeGranularityOpts.DAY.name
+            timestamp_value_factory_class_string == kutil.LOCAL_DATE_VALUE
+            and params.time_granularity == params.TimeGranularityOpts.DAY.name
         )
 
         # this option toggles the output schema in two scenarios:
@@ -168,15 +153,12 @@ class AggregationGranularity:
         ## if the selected time granularity is "DAY", "HOUR", "MINUTE" and "SECOND" then the output schema will contain two columns:
         ### one will contain a timestamp column of corresponding timestamp data type.
         ### and target column after the aggregation method is applied.
-        if (
-            self.aggreg_params.time_granularity
-            == self.aggreg_params.TimeGranularityOpts.YEAR.name
-        ):
+        if params.time_granularity == params.TimeGranularityOpts.YEAR.name:
             aggregation_category = AggregationGranularityParams.AggregationCategory.YEAR
-        elif self.aggreg_params.time_granularity in [
-            self.aggreg_params.TimeGranularityOpts.WEEK.name,
-            self.aggreg_params.TimeGranularityOpts.MONTH.name,
-            self.aggreg_params.TimeGranularityOpts.QUARTER.name,
+        elif params.time_granularity in [
+            params.TimeGranularityOpts.WEEK.name,
+            params.TimeGranularityOpts.MONTH.name,
+            params.TimeGranularityOpts.QUARTER.name,
         ]:
             aggregation_category = (
                 AggregationGranularityParams.AggregationCategory.WEEK_OR_LONGER
@@ -186,16 +168,13 @@ class AggregationGranularity:
                 AggregationGranularityParams.AggregationCategory.DAY_OR_SHORTER
             )
 
-        ## the fnction returns the final output schema
-        output_schema = self.__create_schema(
+        return self.__create_schema(
             target_column_is_of_type_double,
             contains_timezone,
             contains_time,
             contains_date,
             aggregation_category,
         )
-
-        return output_schema
 
     def __create_schema(
         self,
@@ -205,10 +184,6 @@ class AggregationGranularity:
         contains_date: bool,
         aggregation_category: AggregationGranularityParams.AggregationCategory,
     ):
-        """
-        This function generates the output schema based on the checks that are applied beforehand.
-        """
-
         # specify first column
         if (
             aggregation_category
@@ -242,99 +217,76 @@ class AggregationGranularity:
 
         return knext.Schema(data_types, column_names)
 
-    def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Schema):
+    def execute(self, exec_context: knext.ExecutionContext, input_1: knext.Table):
         df = input_1.to_pandas()
 
-        date_time_col_orig = df[self.aggreg_params.datetime_col]
-        agg_col = df[self.aggreg_params.aggregation_column]
+        params = self.aggreg_params
 
-        # cast to long type, this is done to reduce the complication of worrying about if the output specs of target column is weather int32 and int64.
+        date_time_col_orig = df[params.datetime_col]
+        agg_col = df[params.aggregation_column]
+
+        # Cast agg_col always to long to avoid casting issues
         if pd.api.types.is_integer_dtype(agg_col):
             agg_col = agg_col.astype(np.int64)
         exec_context.set_progress(0.1)
 
-        # get timestamp data type
         kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
 
-        # if condition to handle zoned date&time
         if kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL:
             a = kutil.cast_to_related_type(kn_date_time_format, date_time_col_orig)
-
             date_time_col, kn_date_time_format, zone_offset = a[0], a[1], a[2]
 
         else:
-            # returns series of date time according to the date format and knime supported data type
             a = kutil.cast_to_related_type(kn_date_time_format, date_time_col_orig)
-
-            # handle multiple iterable error. This is done to handle dynamic assignment of variables in case zoned date and time type is encountered
             date_time_col, kn_date_time_format = a[0], a[1]
 
         exec_context.set_progress(0.5)
-        # extract date&time fields from the input timestamp column
+
         df_time = kutil.extract_time_fields(
             date_time_col, kn_date_time_format, str(date_time_col.name)
         )
 
-        # this variable is assigned the time granularity selected by the user
-        selected_time_granularity = self.aggreg_params.time_granularity.capitalize()
+        time_granularity = params.time_granularity.capitalize()
+        aggreg_method = params.aggregation_methods
 
-        # this variable is assigned the aggregation method selected by the user
-        selected_aggreg_method = self.aggreg_params.aggregation_methods
-
-        # raise exception if selected time granularity does not exists in the input timestamp column
-        if selected_time_granularity not in df_time.columns:
+        if time_granularity not in df_time.columns:
             raise knext.InvalidParametersError(
-                f"""Selected timestamp column does not contain {selected_time_granularity} field."""
+                f"""Selected timestamp column does not contain {time_granularity} field."""
             )
         exec_context.set_progress(0.6)
 
-        # modify the input timestamp as per the time_gran selected. This modifies the timestamp column depending on the granularity selected
-        df_time_updated = self.__modify_time(
-            selected_time_granularity, kn_date_time_format, df_time
-        )
+        df_time = self.__modify_time(time_granularity, kn_date_time_format, df_time)
 
         exec_context.set_progress(0.7)
 
-        # if kn_date_time_format contains zone and if selected time granularity is less than day then append the zone back, other wise ignore
         if (kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL) and (
-            selected_time_granularity in kutil.time_granularity_list()
+            time_granularity in kutil.time_granularity_list()
         ):
-            df_time_updated = self.__append_time_zone(df_time_updated, zone_offset)
+            df_time = self.__append_time_zone(df_time, zone_offset)
 
-        # perform final aggregation
-        df_grouped = self.__aggregate(
-            df_time_updated, agg_col, selected_time_granularity, selected_aggreg_method
-        )
+        df_grouped = self.__aggregate(df_time, agg_col, time_granularity, aggreg_method)
 
-        if pd.api.types.is_integer_dtype(
-            df_grouped[self.aggreg_params.aggregation_column]
-        ):
-            df_grouped[self.aggreg_params.aggregation_column] = df_grouped[
-                self.aggreg_params.aggregation_column
+        if pd.api.types.is_integer_dtype(df_grouped[params.aggregation_column]):
+            df_grouped[params.aggregation_column] = df_grouped[
+                params.aggregation_column
             ].astype(np.int64)
 
         exec_context.set_progress(0.8)
-        if selected_time_granularity not in (
-            self.aggreg_params.TimeGranularityOpts.QUARTER.name.capitalize(),
-            self.aggreg_params.TimeGranularityOpts.MONTH.name.capitalize(),
-            self.aggreg_params.TimeGranularityOpts.WEEK.name.capitalize(),
+        if time_granularity not in (
+            params.TimeGranularityOpts.QUARTER.name.capitalize(),
+            params.TimeGranularityOpts.MONTH.name.capitalize(),
+            params.TimeGranularityOpts.WEEK.name.capitalize(),
         ):
-            df_grouped = df_grouped[
-                [self.aggreg_params.datetime_col, self.aggreg_params.aggregation_column]
-            ]
+            df_grouped = df_grouped[[params.datetime_col, params.aggregation_column]]
         exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(df_grouped)
 
-    def __modify_time(
-        self, time_gran: str, kn_date_time_type: str, df_time: pd.DataFrame
-    ):
+    def __modify_time(self, time_gran: str, kn_date_time_type: str, df: pd.DataFrame):
         """
         This function modifies the input timestamp column according to the type of granularity selected. For instance, if the selected time granularity is "Quarter" then
         the next higher time value against quarter will be "Year". Hence only "Year" will be returned.
         """
-
-        df = df_time.copy()
 
         if kn_date_time_type == kutil.DEF_TIME_LABEL:
             date_col = pd.to_datetime(
@@ -343,7 +295,6 @@ class AggregationGranularity:
         else:
             date_col = df[self.aggreg_params.datetime_col].astype("datetime64[ns]")
 
-        # check if granularity level is
         if time_gran in (
             self.aggreg_params.TimeGranularityOpts.YEAR.name.capitalize(),
             self.aggreg_params.TimeGranularityOpts.QUARTER.name.capitalize(),
@@ -392,7 +343,7 @@ class AggregationGranularity:
         self, kn_date_time_type: str, time_gran: str, date: pd.Series
     ) -> pd.Series:
         """
-        This function is use to floor the timestamp against the selected time granularity.
+        Floor the timestamp against the selected time granularity.
         """
 
         if kn_date_time_type == kutil.DEF_TIME_LABEL:
@@ -414,15 +365,12 @@ class AggregationGranularity:
         agg_type: str,
     ):
         """
-        This function performs the final aggregation based on the selected level of granularity in given datetime column.
+        Final aggregation based on the selected level of granularity in given datetime column.
         The aggregation is done on the modified date column and the datetime field corresponding to the selected granularity.
-
         """
 
-        # pre-process
         df = pd.concat([df_time, aggregation_column], axis=1)
 
-        # filter out necessary columns
         df = df[
             [
                 self.aggreg_params.datetime_col,
@@ -430,13 +378,13 @@ class AggregationGranularity:
                 time_gran,
             ]
         ]
-        # select granularity
-        value = self.aggreg_params.AggregationDictionary[agg_type.upper()].value[1]
+        granularity = self.aggreg_params.AggregationDictionary[agg_type.upper()].value[
+            1
+        ]
 
-        # aggregate for final output
         df = (
             df.groupby([df[self.aggreg_params.datetime_col], time_gran])
-            .agg(value)
+            .agg(granularity)
             .reset_index()
         )
 
@@ -446,7 +394,7 @@ class AggregationGranularity:
         """
         This function re-assignes time zones to date&time column. This function is only called if input date&time column containes time zone.
         """
-
+        # TODO Find faster approach # NOSONAR not urgent
         date_col_internal = date_col
         for i in range(0, len(zoned.index)):
             date_col_internal[self.aggreg_params.datetime_col][i] = date_col_internal[

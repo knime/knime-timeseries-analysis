@@ -1,5 +1,5 @@
 import logging
-import knime_extension as knext
+import knime.extension as knext
 from util import utils as kutil
 import pandas as pd
 import numpy as np
@@ -64,27 +64,24 @@ class AutoCorrNode:
 
     def execute(self, exec_context: knext.ExecutionContext, input_table):
         # height and width of the autocorrelation plot
-        __width = 12
-        __height = 12
+        width = 12
+        height = 12
 
-        # number of rows in the plot
-        __nrows = 2
-
-        # number of columns for plot
-        __ncols = 1
+        num_rows = 2
+        num_cols = 1
 
         # confidence interval
-        __alpha = 0.05
+        alpha = 0.05
 
         df = input_table.to_pandas()
 
         regression_target = df[self.target_col]
-        self._exec_validate(regression_target)
+        self.__validate_target_col(regression_target)
 
         exec_context.set_progress(0.1)
 
-        # compute acf values along with confidence intervals
-        acf_x, acf_confint = acf(regression_target, nlags=self.max_lag, alpha=__alpha)
+        # compute autocorrelation function (acf) values and confidence intervals
+        acf_x, acf_confint = acf(regression_target, nlags=self.max_lag, alpha=alpha)
 
         # compute mid-point of upper and lower bounds for acf
         margin_error_acf = 0.5 * (acf_confint[:, 1] - acf_confint[:, 0])
@@ -96,10 +93,8 @@ class AutoCorrNode:
         acf_x = pd.DataFrame(acf_x, columns=["ACF"])
 
         exec_context.set_progress(0.2)
-        # compute pacf values along with confidence intervals
-        pacf_x, pacf_confint = pacf(
-            regression_target, nlags=self.max_lag, alpha=__alpha
-        )
+        # compute partial autocorrelation function (pacf) values and confidence intervals
+        pacf_x, pacf_confint = pacf(regression_target, nlags=self.max_lag, alpha=alpha)
         # compute mid-point of upper and lower bounds for pacf
         margin_error_pacf = 0.5 * (pacf_confint[:, 1] - pacf_confint[:, 0])
 
@@ -118,12 +113,12 @@ class AutoCorrNode:
         df_out["Lags"] = df_out["Lags"].astype(np.int32)
         exec_context.set_progress(0.4)
 
-        _, ax = plt.subplots(nrows=__nrows, ncols=__ncols, figsize=(__width, __height))
+        _, ax = plt.subplots(nrows=num_rows, ncols=num_cols, figsize=(width, height))
         plot_acf(
             regression_target,
             lags=self.max_lag,
             ax=ax[0],
-            alpha=__alpha,
+            alpha=alpha,
         )
         exec_context.set_progress(0.5)
         plot_pacf(
@@ -131,7 +126,7 @@ class AutoCorrNode:
             lags=self.max_lag,
             ax=ax[1],
             method="ols",
-            alpha=__alpha,
+            alpha=alpha,
         )
         exec_context.set_progress(0.6)
 
@@ -141,22 +136,13 @@ class AutoCorrNode:
 
         return (knext.Table.from_pandas(df_out), knext.view_matplotlib())
 
-    def _exec_validate(self, target):
-        """
-        This function validates selected numeric column at Panda's end
-        """
-        ########################################################
-        # TARGET COLUMN CHECK
-        ########################################################
-
-        # check for missing values first
+    def __validate_target_col(self, target):
         if kutil.check_missing_values(target):
             missing_count = kutil.count_missing_values(target)
             raise knext.InvalidParametersError(
-                f"""There are {missing_count} missing values in the selected column. Consider using a Missing Value node to impute missing values beforehand."""
+                f"There are {missing_count} missing values in the selected column. Consider using a Missing Value node to impute missing values beforehand."
             )
 
-        # check maximum lags cannot be more than the number of rows
         if self.max_lag >= kutil.number_of_rows(target):
             raise knext.InvalidParametersError(
                 "Maximum number of lags cannot be greater than or equal to the number of rows."

@@ -39,33 +39,27 @@ class SarimaForcasterApply:
     def configure(
         self,
         configure_context: knext.ConfigurationContext,
-        input_schema_1: knext.Schema,  # NOSONAR input_schema is necessary
+        input_schema: knext.Schema,  # NOSONAR input_schema is necessary
     ):
         if self.natural_log and self.dynamic_check:
             configure_context.set_warning(
                 "Enabling dynamic predictions with log transformation can create invalid predictions."
             )
-
-        forecast_schema = knext.Column(knext.double(), "Forecasts")
-
-        return forecast_schema
+        return knext.Column(knext.double(), "Forecasts")
 
     def execute(self, exec_context: knext.ExecutionContext, model_input):
-        model_fit = pickle.loads(model_input)
-
+        trained_model = pickle.loads(model_input)
         exec_context.set_progress(0.4)
 
         # make out-of-sample forecasts
-        forecasts = model_fit.forecast(steps=self.number_of_forecasts).to_frame(
+        forecasts = trained_model.forecast(steps=self.number_of_forecasts).to_frame(
             name="Forecasts"
         )
 
-        exec_context.set_progress(0.6)
+        exec_context.set_progress(0.8)
 
         # reverse log transformation for forecasts
         if self.natural_log:
             forecasts = np.exp(forecasts)
-
-        exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(forecasts)

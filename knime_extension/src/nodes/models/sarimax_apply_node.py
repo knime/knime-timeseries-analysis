@@ -1,7 +1,7 @@
 import logging
 import knime.extension as knext
 from util import utils as kutil
-from ..configs.models.sarimax_apply import SarimaxForecasterParms
+from ..configs.models.sarimax_apply import SarimaxForecasterParams
 import numpy as np
 import pickle
 
@@ -29,7 +29,7 @@ class SXForecaster:
     Based on a trained SARIMAX model given at the model input port of this node, the forecast values are computed. This apply node can also be used to update exogenous variable data for forecasting.
     """
 
-    sarimax_params = SarimaxForecasterParms()
+    sarimax_params = SarimaxForecasterParams()
 
     def configure(
         self,
@@ -46,28 +46,22 @@ class SXForecaster:
                 kutil.is_numeric,
             )
         )
-
-        forecast_schema = knext.Column(knext.double(), "Forecasts")
-
-        return forecast_schema
+        return knext.Column(knext.double(), "Forecasts")
 
     def execute(self, exec_context: knext.ExecutionContext, input_1, input_2):
+        model_fit = pickle.loads(input_1)
         exog_df = input_2.to_pandas()
-
-        exog_var_forecasts = exog_df[
+        exog_forecasts_col = exog_df[
             self.sarimax_params.predictor_params.exog_column_forecasts
         ]
-
-        model_fit = pickle.loads(input_1)
-
         exec_context.set_progress(0.2)
 
-        self._exec_validate(exog_var_forecasts)
+        self.__validate(exog_forecasts_col)
 
         # make out-of-sample forecasts
         forecasts = model_fit.forecast(
             steps=self.sarimax_params.predictor_params.number_of_forecasts,
-            exog=exog_var_forecasts,
+            exog=exog_forecasts_col,
         ).to_frame(name="Forecasts")
 
         exec_context.set_progress(0.7)
@@ -81,21 +75,15 @@ class SXForecaster:
         return knext.Table.from_pandas(forecasts)
 
     # function to perform validation on dataframe within execution context
-    def _exec_validate(self, exog_forecast):
-        ########################################################
-        # EXOGENOUS FORECASTS COLUMN CHECK
-        ########################################################
-
-        # check for missing values first
-        if kutil.check_missing_values(exog_forecast):
-            missing_count_exog_fore = kutil.count_missing_values(exog_forecast)
+    def __validate(self, exog_forecast_col):
+        if kutil.check_missing_values(exog_forecast_col):
+            missing_count_exog_fore = kutil.count_missing_values(exog_forecast_col)
             raise knext.InvalidParametersError(
                 f"""There are {missing_count_exog_fore} missing values in the exogenous column selected for forecasting."""
             )
 
-        # check that the number of rows for exogenous input relating to forecasts and number of forecasts to be made should be equal
         if (
-            kutil.number_of_rows(exog_forecast)
+            kutil.number_of_rows(exog_forecast_col)
             != self.sarimax_params.predictor_params.number_of_forecasts
         ):
             raise knext.InvalidParametersError(
