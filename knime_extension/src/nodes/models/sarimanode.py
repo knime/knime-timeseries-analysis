@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="SARIMA Learner",
+    name="SARIMA Learner (Labs)",
     node_type=knext.NodeType.LEARNER,
     icon_path="icons/models/SARIMA_Forecaster.png",
     category=kutil.category_models,
@@ -100,9 +100,12 @@ class SarimaForcaster:
 
             regression_target = np.log(regression_target)
 
+        exec_context.set_progress(0.1)
+
         # validate if target variable has any missing values or not
         self._exec_validate(regression_target)
 
+        exec_context.set_progress(0.3)
         # model initialization and training
         model = SARIMAX(
             regression_target,
@@ -118,8 +121,12 @@ class SarimaForcaster:
                 self.sarima_params.learner_params.seasonal_period_param,
             ),
         )
+
+        exec_context.set_progress(0.5)
+
         model_fit = model.fit()
 
+        exec_context.set_progress(0.8)
         # produce residuals
         residuals = model_fit.resid
 
@@ -154,6 +161,7 @@ class SarimaForcaster:
         # create model pickle
         model_binary = pickle.dumps(model_fit)
 
+        exec_context.set_progress(0.9)
         return (
             knext.Table.from_pandas(forecasts),
             knext.Table.from_pandas(in_samps_residuals),

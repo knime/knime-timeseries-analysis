@@ -1,10 +1,8 @@
 from .parent import _PredictorParams
 import knime.extension as knext
-import pickle
 
 
 class SPredictorApplyParams(_PredictorParams):
-
     """
 
     SARIMA Predictor Parameter class inheriting the private class _PredictorParams above.

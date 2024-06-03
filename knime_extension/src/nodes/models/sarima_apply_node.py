@@ -2,7 +2,6 @@ import logging
 import knime.extension as knext
 from util import utils as kutil
 from ..configs.models.sarima_apply import SPredictorApplyParams
-import pandas as pd
 import numpy as np
 import pickle
 
@@ -10,7 +9,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="SARIMA Predictor",
+    name="SARIMA Predictor (Labs)",
     node_type=knext.NodeType.PREDICTOR,
     icon_path="icons/models/SARIMA_Forecaster-Apply.png",
     category=kutil.category_models,
@@ -37,8 +36,11 @@ class SarimaForcasterApply:
     dynamic_check = sarima_params.dynamic_check
     number_of_forecasts = sarima_params.number_of_forecasts
 
-    # merge in-samples and residuals (In-Samples & Residuals)
-    def configure(self, configure_context, input_schema_1):
+    def configure(
+        self,
+        configure_context: knext.ConfigurationContext,
+        input_schema_1: knext.Schema,  # NOSONAR input_schema is necessary
+    ):
         if self.natural_log and self.dynamic_check:
             configure_context.set_warning(
                 "Enabling dynamic predictions with log transformation can create invalid predictions."
@@ -51,13 +53,19 @@ class SarimaForcasterApply:
     def execute(self, exec_context: knext.ExecutionContext, model_input):
         model_fit = pickle.loads(model_input)
 
+        exec_context.set_progress(0.4)
+
         # make out-of-sample forecasts
         forecasts = model_fit.forecast(steps=self.number_of_forecasts).to_frame(
             name="Forecasts"
         )
 
+        exec_context.set_progress(0.6)
+
         # reverse log transformation for forecasts
         if self.natural_log:
             forecasts = np.exp(forecasts)
+
+        exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(forecasts)

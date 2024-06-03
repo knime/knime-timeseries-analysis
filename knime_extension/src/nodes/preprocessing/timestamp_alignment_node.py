@@ -3,7 +3,6 @@ import knime.extension as knext
 from util import utils as kutil
 import pandas as pd
 from ..configs.preprocessing.timealign import TimeStampAlignmentParams
-import datetime
 
 NEW_COLUMN = " (New)"
 
@@ -11,7 +10,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="Date&Time Aligner",
+    name="Date&Time Aligner (Labs)",
     node_type=knext.NodeType.MANIPULATOR,
     icon_path="icons/preprocessing/Timestamp_Alignment.png",
     category=kutil.category_processsing,
@@ -72,9 +71,13 @@ class TimestampAlignmentNode:
     def execute(self, exec_context: knext.ExecutionContext, input_table):
         df = input_table.to_pandas()
 
+        # select timestamp column
         date_time_col_orig = df[self.ts_align_params.datetime_col]
 
+        # get factory type of the timestamp
         kn_date_time_format = kutil.get_type_timestamp(str(date_time_col_orig.dtype))
+
+        exec_context.set_progress(0.2)
 
         # if condition to handle zoned date&time
         if kn_date_time_format == kutil.DEF_ZONED_DATE_LABEL:
@@ -90,8 +93,9 @@ class TimestampAlignmentNode:
             date_time_col, kn_date_time_format = a[0], a[1]
 
         # this variable is assigned to the period selected by the user
-        selected_period = self.ts_align_params.period.lower()
+        selected_period = self.ts_align_params.period.capitalize()
 
+        exec_context.set_progress(0.3)
         # extract date&time fields from the input timestamp column
         df_time = kutil.extract_time_fields(
             date_time_col, kn_date_time_format, str(date_time_col.name)
@@ -112,12 +116,17 @@ class TimestampAlignmentNode:
             df_time_updated = self.__modify_time(kn_date_time_format, df_time)
 
         df = df.drop(columns=[self.ts_align_params.datetime_col])
+
+        exec_context.set_progress(0.4)
+
         df = (
             df_time_updated.merge(df, how="left", left_index=True, right_index=True)
             .reset_index(drop=True)
             .sort_values(self.ts_align_params.datetime_col + NEW_COLUMN)
             .reset_index(drop=True)
         )
+
+        exec_context.set_progress(0.7)
 
         if self.ts_align_params.replace_original:
             df = df.drop(columns=[self.ts_align_params.datetime_col]).rename(
@@ -127,9 +136,12 @@ class TimestampAlignmentNode:
                 }
             )
 
+        exec_context.set_progress(0.9)
         return knext.Table.from_pandas(df)
 
-    def __modify_time(self, kn_date_format: str, df_time, tz=None) -> pd.DataFrame:
+    def __modify_time(
+        self, kn_date_format: str, df_time: pd.DataFrame, tz=None
+    ) -> pd.DataFrame:
         """
         This function is where the date column is processed to fill in for missing time stamp values
         """
@@ -202,9 +214,9 @@ class TimestampAlignmentNode:
         ).rename(columns={0: self.ts_align_params.datetime_col + NEW_COLUMN})
 
         # do a left join and return only the actual time input and updated timestamp column
-        new_df = df3.merge(
+        new_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
-        )  # .reset_index(drop=True)
+        )
         new_df = new_df[
             [
                 self.ts_align_params.datetime_col,

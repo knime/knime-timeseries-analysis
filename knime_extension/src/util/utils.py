@@ -2,11 +2,13 @@
 Several utility functions are reused from Harvard's spatial data lab repository for Geospatial Analytics Extension.
 https://github.com/spatial-data-lab/knime-geospatial-extension/blob/main/knime_extension/src/util/knime_utils.py
 """
+
 import knime.extension as knext
 import pandas as pd
 from datetime import datetime, date, time, timedelta
-from typing import Callable, Union, Tuple
+from typing import Callable
 import logging
+import numpy as np
 
 
 LOGGER = logging.getLogger(__name__)
@@ -48,9 +50,10 @@ TIME_FORMAT = "%H:%M:%S"
 ############################################
 # Categories
 ############################################
+BASE_CATEGORY_PATH = "/labs/ts"
 
 category_processsing = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="proc",
     name="Preprocessing",
     description="Nodes for pre-processing timestamp data.",
@@ -58,7 +61,7 @@ category_processsing = knext.category(
 )
 
 category_models = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="models",
     name="Models",
     description="Nodes for modelling time series",
@@ -66,7 +69,7 @@ category_models = knext.category(
 )
 
 category_analytics = knext.category(
-    path="/community/ts",
+    path=BASE_CATEGORY_PATH,
     level_id="analysis",
     name="Analysis",
     description="Nodes for analysis for time series application",
@@ -204,12 +207,12 @@ def time_granularity_list() -> list:
     @return: list of item fields in Time
     """
     return [
-        "hour",
-        "minute",
-        "second",
+        "Hour",
+        "Minute",
+        "Second",
         # not supported yet
-        "millisecond",
-        "microsecond",
+        "Millisecond",
+        "Microsecond",
     ]
 
 
@@ -259,6 +262,7 @@ def extract_time_fields(
     @return: Pandas datafram with timestamp column and relevant date&time fields.
     """
 
+    cols_cap = [series_name]
     if date_time_format == DEF_ZONED_DATE_LABEL:
         df = pd.to_datetime(date_time_col, format=ZONED_DATE_TIME_FORMAT).to_frame()
 
@@ -266,12 +270,19 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
         df["hour"] = df[series_name].dt.hour
         df["minute"] = df[series_name].dt.minute
         df["second"] = df[series_name].dt.second
 
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
         return df
 
     elif date_time_format == DEF_DATE_LABEL:
@@ -280,10 +291,18 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
 
         df[series_name] = df[series_name].dt.date
+
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
 
         return df
 
@@ -297,6 +316,10 @@ def extract_time_fields(
         # ensure to do this in the end
         df[series_name] = df[series_name].dt.time
 
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
+
         return df
 
     elif date_time_format == DEF_DATE_TIME_LABEL:
@@ -305,11 +328,19 @@ def extract_time_fields(
         df["year"] = df[series_name].dt.year
         df["quarter"] = df[series_name].dt.quarter
         df["month"] = df[series_name].dt.month
+
+        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
         df["week"] = df[series_name].dt.isocalendar().week
+        df["week"] = df["week"].astype(np.int32)
+
         df["day"] = df[series_name].dt.day
         df["hour"] = df[series_name].dt.hour
         df["minute"] = df[series_name].dt.minute
         df["second"] = df[series_name].dt.second
+
+        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+
+        df.columns = cols_cap
 
         return df
 

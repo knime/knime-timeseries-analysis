@@ -2,16 +2,14 @@ import logging
 import knime.extension as knext
 from util import utils as kutil
 from ..configs.models.sarimax_apply import SarimaxForecasterParms
-import pandas as pd
 import numpy as np
-from statsmodels.tsa.statespace.sarimax import SARIMAX
 import pickle
 
 LOGGER = logging.getLogger(__name__)
 
 
 @knext.node(
-    name="SARIMAX Predictor",
+    name="SARIMAX Predictor (Labs)",
     node_type=knext.NodeType.LEARNER,
     icon_path="icons/models/SARIMAX_Forecaster-Apply.png",
     category=kutil.category_models,
@@ -36,7 +34,7 @@ class SXForecaster:
     def configure(
         self,
         configure_context: knext.ConfigurationContext,
-        input_model,
+        input_schema_1,  # NOSONAR
         input_schema_2,
     ):
         # set exog input for forecasting
@@ -61,6 +59,9 @@ class SXForecaster:
         ]
 
         model_fit = pickle.loads(input_1)
+
+        exec_context.set_progress(0.2)
+
         self._exec_validate(exog_var_forecasts)
 
         # make out-of-sample forecasts
@@ -69,9 +70,13 @@ class SXForecaster:
             exog=exog_var_forecasts,
         ).to_frame(name="Forecasts")
 
+        exec_context.set_progress(0.7)
+
         # reverse log transformation for forecasts
         if self.sarimax_params.predictor_params.natural_log:
             forecasts = np.exp(forecasts)
+
+        exec_context.set_progress(0.9)
 
         return knext.Table.from_pandas(forecasts)
 
