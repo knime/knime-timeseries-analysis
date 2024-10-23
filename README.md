@@ -1,5 +1,7 @@
 # Time Series Analysis Extension for KNIME
 
+[![Jenkins](https://jenkins.knime.com/buildStatus/icon?job=knime-timeseries-analysis%2Fmaster)](https://jenkins.knime.com/job/knime-timeseries-analysis/job/master/)
+
 This repository contains code of the Time Series Analysis extension for [KNIME Analytics Platform](https://www.knime.com/knime-analytics-platform "KNIME"). This extension provides nodes for time series modeling, analysis, and processing.
 
 This extension is maintained by Ali Asghar Marvi & Corey Weisinger from the evangelism team at [KNIME](https://www.knime.com/ "KNIME") and by the [KNIME Team Rakete](mailto:team-rakete@knime.com).
