@@ -1,4 +1,3 @@
-from copy import deepcopy
 import logging
 import knime.extension as knext
 from util import utils as kutil
@@ -64,7 +63,11 @@ class TimestampAlignmentNode:
 
     def execute(self, exec_context: knext.ExecutionContext, input_table: knext.Table):
         df = input_table.to_pandas()
+
         datetime_col = df[self.params.datetime_col]
+
+        self.__validate(datetime_col)
+
         timestamp_value_factory_class_string = kutil.get_type_timestamp(
             str(datetime_col.dtype)
         )
@@ -138,6 +141,7 @@ class TimestampAlignmentNode:
 
         # if Replace timestamp column is true, then we need to ensure that the columns in the dataframe are in the same order as the input table schema
         else:
+            
             df = df.loc[:, input_table.schema.column_names]
 
         return knext.Table.from_pandas(df)
@@ -225,3 +229,16 @@ class TimestampAlignmentNode:
                 self.params.datetime_col + NEW_COLUMN,
             ]
         ]
+    
+    def __validate(self, timestamp_column: pd.Series):
+        """
+        Validate the timestamp column to ensure remaining execution do not break.
+        """
+        
+        # ideally an option "Skip missing values" should be added to the node configuration,
+        # so that the node can skip missing values in the timestamp column and not break.
+        # but since it is not available, we prompt user to clean the data before proceeding.
+        if kutil.check_missing_values(timestamp_column):
+            raise ValueError(
+                "The selected timestamp column contains missing values. Please clean the data before proceeding."
+            )

@@ -92,6 +92,7 @@ class TimeStampAlignmentParams:
         label="Replace timestamp column",
         description="Check this box in order to preserve the original timestamp column in the input table.",
         default_value=True,
+        since_version="5.5.0"
     )
 
     period = knext.EnumParameter(
