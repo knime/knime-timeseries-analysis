@@ -1,3 +1,4 @@
+from copy import deepcopy
 import logging
 import knime.extension as knext
 from util import utils as kutil
@@ -46,7 +47,7 @@ class TimestampAlignmentNode:
             kutil.is_type_timestamp,
         )
 
-        date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[0].ktype
+        date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[input_schema.column_names.index(self.params.datetime_col)].ktype
 
         if not self.params.replace_original:
             datetime_index = (
@@ -120,6 +121,24 @@ class TimestampAlignmentNode:
                 }
             )
         exec_context.set_progress(0.9)
+
+        #get specs from configure and ensure that columns in dataframe are in the same order.
+        if not self.params.replace_original:
+
+            datetime_index = (
+                input_table.schema.column_names.index(self.params.datetime_col) + 1
+            )
+
+            # get shallow copy of the list of column names and insert the new datetime column
+            # next to the index of the original datetime column
+            new_list = input_table.schema.column_names.copy()
+            new_list.insert(datetime_index, self.params.datetime_col + NEW_COLUMN)
+
+            df = df.loc[:, new_list]
+
+        # if Replace timestamp column is true, then we need to ensure that the columns in the dataframe are in the same order as the input table schema
+        else:
+            df = df.loc[:, input_table.schema.column_names]
 
         return knext.Table.from_pandas(df)
 
