@@ -176,7 +176,7 @@ def extract_zone(value):
 def localize_timezone(value: pd.Timestamp, zone) -> pd.Timestamp:
     """
     This function updates the Pandas Timestamp value with the time zone. If "None" is passed timezone will be removed from
-    timestamp returning a timezone naive value.
+    column returning a value with no timezone.
     @return: assigns timezone to timestamp.
 
     """
@@ -198,42 +198,70 @@ def time_granularity_list() -> list:
     ]
 
 
-def cast_to_related_type(value_type: str, column: pd.Series):
+def cast_to_related_type(
+    value_type: str, column: pd.Series
+) -> tuple[pd.Series, str] | tuple[pd.Series, str, pd.Series]:
     """
-    This function converts the KNIME's date&time column to Pandas native date&time column. The format for the Pandas datetime
-    is selected based on the respective KNIME's date&time factory type.
-    @return: Pandas datetime Series and corresponding name of the Knime's date&time factory type.
+    Converts a KNIME timestamp column to a Pandas native timestamp format.
+
+    Takes a KNIME timestamp column and converts it to the appropriate Pandas timestamp format based on the
+    KNIME factory type. Handles zoned datetimes, dates only, times only, and datetime values.
+
+    Args:
+        value_type: The KNIME timestamp factory type string (e.g. "ZonedDateTimeValueFactory2")
+        column: The pandas Series containing the timestamp values to convert
+
+    Returns:
+        For zoned datetimes:
+            A tuple of (converted datetime Series, factory type string, timezone offset Series)
+        For other types:
+            A tuple of (converted datetime Series, factory type string)
+
+    Raises:
+        ValueError: If an invalid value_type is provided
     """
 
-    # parse date time with zones
-    if DEF_ZONED_DATE_LABEL == value_type:
-        column = column.apply(convert_timestamp)
+    conversion_mappings = {
+        DEF_ZONED_DATE_LABEL: {
+            "preprocess": lambda col: col.apply(convert_timestamp),
+            "extract_zone": lambda col: col.apply(extract_zone),
+            "localize": lambda col: col.apply(localize_timezone, zone=None),
+            "convert": lambda col: pd.to_datetime(col, format=ZONED_DATE_TIME_FORMAT),
+            "return_zone": True,
+        },
+        DEF_DATE_LABEL: {
+            "convert": lambda col: pd.to_datetime(col, format=DATE_FORMAT),
+            "return_zone": False,
+        },
+        DEF_TIME_LABEL: {
+            "convert": lambda col: pd.to_datetime(col, format=TIME_FORMAT).dt.time,
+            "return_zone": False,
+        },
+        DEF_DATE_TIME_LABEL: {
+            "convert": lambda col: pd.to_datetime(col, format=DATE_TIME_FORMAT),
+            "return_zone": False,
+        },
+    }
 
-        zone_offset = column.apply(extract_zone)
+    if value_type not in conversion_mappings:
+        raise ValueError(f"Unsupported value_type: {value_type}")
 
-        s_dateimezone = column.apply(localize_timezone, zone=None)
+    mapping = conversion_mappings[value_type]
 
-        s_dateimezone = pd.to_datetime(s_dateimezone, format=ZONED_DATE_TIME_FORMAT)
+    if "preprocess" in mapping:
+        column = mapping["preprocess"](column)
 
-        return s_dateimezone, DEF_ZONED_DATE_LABEL, zone_offset
+    zone_offset = None
+    if mapping.get("return_zone", False):
+        zone_offset = mapping["extract_zone"](column)
+        column = mapping["localize"](column)
 
-    # parse dates only
-    elif DEF_DATE_LABEL == value_type:
-        s_date = pd.to_datetime(column, format=DATE_FORMAT)
+    result = mapping["convert"](column)
 
-        return s_date, DEF_DATE_LABEL
-
-    # cast only time objects
-    elif DEF_TIME_LABEL == value_type:
-        s_time = pd.to_datetime(column, format=TIME_FORMAT)
-
-        return s_time.dt.time, DEF_TIME_LABEL
-
-    # parse date & time
-    elif DEF_DATE_TIME_LABEL == value_type:
-        s_datetime = pd.to_datetime(column, format=DATE_TIME_FORMAT)
-
-        return s_datetime, DEF_DATE_TIME_LABEL
+    if mapping.get("return_zone", False):
+        return result, value_type, zone_offset
+    else:
+        return result, value_type
 
 
 def extract_time_fields(
@@ -244,87 +272,78 @@ def extract_time_fields(
     @return: Pandas dataframe with a timestamp column and relevant date&time fields.
     """
 
-    cols_cap = [series_name]
-    if date_time_format == DEF_ZONED_DATE_LABEL:
-        df = pd.to_datetime(date_time_col, format=ZONED_DATE_TIME_FORMAT).to_frame()
+    field_mappings = {
+        DEF_ZONED_DATE_LABEL: {
+            "format": ZONED_DATE_TIME_FORMAT,
+            "fields": [
+                "year",
+                "quarter",
+                "month",
+                "week",
+                "day",
+                "hour",
+                "minute",
+                "second",
+            ],
+            "special_fields": {"zone": lambda col: str(col.dt.tz)},
+            "final_transform": None,
+        },
+        DEF_DATE_LABEL: {
+            "format": DATE_FORMAT,
+            "fields": ["year", "quarter", "month", "week", "day"],
+            "special_fields": {},
+            "final_transform": lambda col: col.dt.date,
+        },
+        DEF_TIME_LABEL: {
+            "format": TIME_FORMAT,
+            "fields": ["hour", "minute", "second"],
+            "special_fields": {},
+            "final_transform": lambda col: col.dt.time,
+        },
+        DEF_DATE_TIME_LABEL: {
+            "format": DATE_TIME_FORMAT,
+            "fields": [
+                "year",
+                "quarter",
+                "month",
+                "week",
+                "day",
+                "hour",
+                "minute",
+                "second",
+            ],
+            "special_fields": {},
+            "final_transform": None,
+        },
+    }
 
-        df["zone"] = str(date_time_col.dt.tz)
-        df["year"] = df[series_name].dt.year
-        df["quarter"] = df[series_name].dt.quarter
-        df["month"] = df[series_name].dt.month
+    if date_time_format not in field_mappings:
+        raise ValueError(f"Unsupported date_time_format: {date_time_format}")
 
-        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
-        df["week"] = df[series_name].dt.isocalendar().week
-        df["week"] = df["week"].astype(np.int32)
+    mapping = field_mappings[date_time_format]
 
-        df["day"] = df[series_name].dt.day
-        df["hour"] = df[series_name].dt.hour
-        df["minute"] = df[series_name].dt.minute
-        df["second"] = df[series_name].dt.second
+    df = pd.to_datetime(date_time_col, format=mapping["format"]).to_frame(
+        name=series_name
+    )
 
-        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
+    for field in mapping["fields"]:
+        if field == "week":
+            df[field] = df[series_name].dt.isocalendar().week.astype(np.int32)
+        else:
+            df[field] = getattr(df[series_name].dt, field)
 
-        df.columns = cols_cap
-        return df
+    for field_name, field_func in mapping["special_fields"].items():
+        df[field_name] = field_func(df[series_name])
 
-    elif date_time_format == DEF_DATE_LABEL:
-        df = pd.to_datetime(date_time_col, format=DATE_FORMAT).to_frame()
+    if mapping["final_transform"]:
+        df[series_name] = mapping["final_transform"](df[series_name])
 
-        df["year"] = df[series_name].dt.year
-        df["quarter"] = df[series_name].dt.quarter
-        df["month"] = df[series_name].dt.month
+    cols_cap = [series_name] + [
+        col.capitalize() for col in df.columns if col != series_name
+    ]
+    df.columns = cols_cap
 
-        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
-        df["week"] = df[series_name].dt.isocalendar().week
-        df["week"] = df["week"].astype(np.int32)
-
-        df["day"] = df[series_name].dt.day
-
-        df[series_name] = df[series_name].dt.date
-
-        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
-
-        df.columns = cols_cap
-
-        return df
-
-    elif date_time_format == DEF_TIME_LABEL:
-        df = pd.to_datetime(date_time_col, format=TIME_FORMAT).to_frame()
-
-        df["hour"] = df[series_name].dt.hour
-        df["minute"] = df[series_name].dt.minute
-        df["second"] = df[series_name].dt.second
-
-        # ensure to do this in the end
-        df[series_name] = df[series_name].dt.time
-
-        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
-
-        df.columns = cols_cap
-
-        return df
-
-    elif date_time_format == DEF_DATE_TIME_LABEL:
-        df = pd.to_datetime(date_time_col, format=DATE_TIME_FORMAT).to_frame()
-
-        df["year"] = df[series_name].dt.year
-        df["quarter"] = df[series_name].dt.quarter
-        df["month"] = df[series_name].dt.month
-
-        # new pandas function to extract week returns unsigned int32 data type, uncompatible with KNIME Python
-        df["week"] = df[series_name].dt.isocalendar().week
-        df["week"] = df["week"].astype(np.int32)
-
-        df["day"] = df[series_name].dt.day
-        df["hour"] = df[series_name].dt.hour
-        df["minute"] = df[series_name].dt.minute
-        df["second"] = df[series_name].dt.second
-
-        cols_cap.extend([col.capitalize() for col in df.columns if col != series_name])
-
-        df.columns = cols_cap
-
-        return df
+    return df
 
 
 def get_type_timestamp(value_type):
