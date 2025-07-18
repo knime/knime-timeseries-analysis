@@ -156,7 +156,12 @@ class TimestampAlignmentNode:
         start = df_time[self.params.datetime_col].astype(str).min()
         end = df_time[self.params.datetime_col].astype(str).max()
         frequency = self.params.TimeFrequency[self.params.period].value[1]
-
+        # # region dbpy_attach
+        # import debugpy
+        # debugpy.listen(5678)
+        # print("Waiting for debugger attach")
+        # debugpy.wait_for_client()
+        # # endregion
         timestamps = pd.date_range(start=start, end=end, freq=frequency)
 
         if kn_date_format == kutil.DEF_TIME_LABEL:

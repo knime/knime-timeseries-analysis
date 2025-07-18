@@ -158,13 +158,26 @@ def __is_type_x(column: knext.Column, type: str) -> bool:
 
 def convert_timestamp(value):
     """
-    This function converts knime compatible datetime values
-    into pandas Timestamp.
-    @return: Panda's Timestamp converted date&time value
+    Converts a value to a pandas Timestamp.
+    Raises ValueError if conversion fails.
     """
-    return pd.Timestamp(value)
+    try:
+        return pd.Timestamp(value)
+    except Exception as e:
+        raise ValueError(f"Failed to convert value '{value}' to pandas Timestamp: {e}")
 
-
+def safe_to_datetime(series, format=None):
+    """
+    Converts a pandas Series to datetime, raising ValueError on failure.
+    """
+    try:
+        if format:
+            return pd.to_datetime(series, format=format)
+        else:
+            return pd.to_datetime(series)
+    except Exception as e:
+        raise ValueError(f"Failed to convert series to datetime with format '{format}': {e}")
+    
 def extract_zone(value):
     """
     This function extracts the time zone from each timestamp value in the pandas timmestamp column.
@@ -218,7 +231,7 @@ def cast_to_related_type(
             A tuple of (converted datetime Series, factory type string)
 
     Raises:
-        ValueError: If an invalid value_type is provided
+        ValueError: If an invalid timestamp is provided
     """
 
     conversion_mappings = {
@@ -226,25 +239,25 @@ def cast_to_related_type(
             "preprocess": lambda col: col.apply(convert_timestamp),
             "extract_zone": lambda col: col.apply(extract_zone),
             "localize": lambda col: col.apply(localize_timezone, zone=None),
-            "convert": lambda col: pd.to_datetime(col, format=ZONED_DATE_TIME_FORMAT),
+            "convert": lambda col: safe_to_datetime(col, format=ZONED_DATE_TIME_FORMAT),
             "return_zone": True,
         },
         DEF_DATE_LABEL: {
-            "convert": lambda col: pd.to_datetime(col, format=DATE_FORMAT),
+            "convert": lambda col: safe_to_datetime(col, format=DATE_FORMAT),
             "return_zone": False,
         },
         DEF_TIME_LABEL: {
-            "convert": lambda col: pd.to_datetime(col, format=TIME_FORMAT).dt.time,
+            "convert": lambda col: safe_to_datetime(col, format=TIME_FORMAT).dt.time,
             "return_zone": False,
         },
         DEF_DATE_TIME_LABEL: {
-            "convert": lambda col: pd.to_datetime(col, format=DATE_TIME_FORMAT),
+            "convert": lambda col: safe_to_datetime(col, format=DATE_TIME_FORMAT),
             "return_zone": False,
         },
     }
 
     if value_type not in conversion_mappings:
-        raise ValueError(f"Unsupported value_type: {value_type}")
+        raise ValueError(f"Unsupported timestamp type: {value_type}")
 
     mapping = conversion_mappings[value_type]
 
@@ -322,6 +335,9 @@ def extract_time_fields(
 
     mapping = field_mappings[date_time_format]
 
+    #following line can be redundant, in case the date&time aggregator and date&time aligner 
+    # can function with all supported datetime types, conversion to 'to_datetime()' from 
+    # and already converted series would not be needed.
     df = pd.to_datetime(date_time_col, format=mapping["format"]).to_frame(
         name=series_name
     )
@@ -443,3 +459,6 @@ def count_negative_values(column: pd.Series) -> int:
     total_neg = (column <= 0).sum()
 
     return total_neg
+
+
+
