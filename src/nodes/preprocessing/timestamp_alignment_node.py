@@ -68,6 +68,9 @@ class TimestampAlignmentNode:
 
         self.__validate(datetime_col)
 
+        # 'knime.pandas_type<int64, {"value_factory_class":"org.knime.core.data.v2.time.LocalTimeValueFactory"}>'
+        print(str(datetime_col.dtype))
+
         timestamp_value_factory_class_string = kutil.get_type_timestamp(
             str(datetime_col.dtype)
         )
@@ -100,14 +103,11 @@ class TimestampAlignmentNode:
             raise knext.InvalidParametersError(
                 f"""Input timestamp column cannot resample on {selected_period} field. Please change timestamp data type and try again."""
             )
-
+        # following dataframe does contains both old date column and newly populated date column
         df_time = self.__modify_time(
             timestamp_value_factory_class_string, df_time, zone_offset
         )
         exec_context.set_progress(0.4)
-
-        # Necessary to avoid new suffixes on datetime_col in the df_time.merge step afterwards
-        df = df.drop(columns=[self.params.datetime_col])
 
         df = (
             df_time.merge(df, how="left", left_index=True, right_index=True)
@@ -144,6 +144,12 @@ class TimestampAlignmentNode:
             
             df = df.loc[:, input_table.schema.column_names]
 
+        # added a patch that ensures that columns that are int32 STAY int32 when sent back to KNIME
+        column_names_that_are_int32 = [k.name for k in input_table._schema._columns if str(k.ktype) == "Number (integer)"]
+
+        for col in column_names_that_are_int32:
+            df[col] = df[col].astype(pd.Int32Dtype())
+
         return knext.Table.from_pandas(df)
 
     def __modify_time(
@@ -156,12 +162,7 @@ class TimestampAlignmentNode:
         start = df_time[self.params.datetime_col].astype(str).min()
         end = df_time[self.params.datetime_col].astype(str).max()
         frequency = self.params.TimeFrequency[self.params.period].value[1]
-        # # region dbpy_attach
-        # import debugpy
-        # debugpy.listen(5678)
-        # print("Waiting for debugger attach")
-        # debugpy.wait_for_client()
-        # # endregion
+
         timestamps = pd.date_range(start=start, end=end, freq=frequency)
 
         if kn_date_format == kutil.DEF_TIME_LABEL:
@@ -211,8 +212,7 @@ class TimestampAlignmentNode:
             columns=[self.params.datetime_col + __duplicate],
         )
 
-        df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)
-
+        df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)      
         # concatenate differenced timestamps with input timestamps
         df3 = pd.DataFrame(
             pd.concat(
@@ -230,7 +230,6 @@ class TimestampAlignmentNode:
 
         return final_df[
             [
-                self.params.datetime_col,
                 self.params.datetime_col + NEW_COLUMN,
             ]
         ]
