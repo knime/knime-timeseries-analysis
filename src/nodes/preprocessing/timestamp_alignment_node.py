@@ -183,9 +183,14 @@ class TimestampAlignmentNode:
             modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_ZONED_DATE_LABEL:
-            unique_tz = pd.unique(tz.astype(str))
+            # region dbpy_attach
+            import debugpy
+            (debugpy.listen(5678), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
+            # endregion
+            
+            unique_tz = pd.unique(tz)
 
-            LOGGER.warn("Timezones in the column:" + str(unique_tz))
+            LOGGER.warning("Timezone(s) in the column:" + str(unique_tz))
 
             if len(unique_tz) > 1:
                 raise knext.InvalidParametersError(
@@ -194,9 +199,7 @@ class TimestampAlignmentNode:
             else:
                 modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
-                    modified_dates[column] = modified_dates[column].dt.tz_localize(
-                        tz[0]
-                    )
+                    modified_dates[column] = modified_dates[column].dt.tz_localize(unique_tz[0], ambiguous = True, nonexistent='shift_forward')
 
         return modified_dates
 

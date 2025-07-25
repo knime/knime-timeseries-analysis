@@ -183,7 +183,7 @@ def extract_zone(value):
     This function extracts the time zone from each timestamp value in the pandas timmestamp column.
     @return: timezone of Timestamp
     """
-    return value.tz
+    return value.tz._name
 
 
 def localize_timezone(value: pd.Timestamp, zone) -> pd.Timestamp:
@@ -264,15 +264,15 @@ def cast_to_related_type(
     if "preprocess" in mapping:
         column = mapping["preprocess"](column)
 
-    zone_offset = None
+    _zone = None
     if mapping.get("return_zone", False):
-        zone_offset = mapping["extract_zone"](column)
+        _zone = mapping["extract_zone"](column)
         column = mapping["localize"](column)
 
     result = mapping["convert"](column)
 
     if mapping.get("return_zone", False):
-        return result, value_type, zone_offset
+        return result, value_type, _zone
     else:
         return result, value_type
 
