@@ -46,7 +46,13 @@ class TimestampAlignmentNode:
             kutil.is_type_timestamp,
         )
 
-        date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[input_schema.column_names.index(self.params.datetime_col)].ktype
+        date_ktype = (
+            input_schema[[self.params.datetime_col]]
+            .delegate._columns[
+                input_schema.column_names.index(self.params.datetime_col)
+            ]
+            .ktype
+        )
 
         if not self.params.replace_original:
             datetime_index = (
@@ -67,9 +73,6 @@ class TimestampAlignmentNode:
         datetime_col = df[self.params.datetime_col]
 
         self.__validate(datetime_col)
-
-        # 'knime.pandas_type<int64, {"value_factory_class":"org.knime.core.data.v2.time.LocalTimeValueFactory"}>'
-        print(str(datetime_col.dtype))
 
         timestamp_value_factory_class_string = kutil.get_type_timestamp(
             str(datetime_col.dtype)
@@ -125,9 +128,8 @@ class TimestampAlignmentNode:
             )
         exec_context.set_progress(0.9)
 
-        #get specs from configure and ensure that columns in dataframe are in the same order.
+        # get specs from configure and ensure that columns in dataframe are in the same order.
         if not self.params.replace_original:
-
             datetime_index = (
                 input_table.schema.column_names.index(self.params.datetime_col) + 1
             )
@@ -141,11 +143,14 @@ class TimestampAlignmentNode:
 
         # if Replace timestamp column is true, then we need to ensure that the columns in the dataframe are in the same order as the input table schema
         else:
-            
             df = df.loc[:, input_table.schema.column_names]
 
         # added a patch that ensures that columns that are int32 STAY int32 when sent back to KNIME
-        column_names_that_are_int32 = [k.name for k in input_table._schema._columns if str(k.ktype) == "Number (integer)"]
+        column_names_that_are_int32 = [
+            k.name
+            for k in input_table._schema._columns
+            if str(k.ktype) == "Number (integer)"
+        ]
 
         for col in column_names_that_are_int32:
             df[col] = df[col].astype(pd.Int32Dtype())
@@ -194,8 +199,10 @@ class TimestampAlignmentNode:
             else:
                 modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
-                    #select any tzone for border timevalues due to daylight savings. Shift time forward for any non-existent time values
-                    modified_dates[column] = modified_dates[column].dt.tz_localize(unique_tz[0], ambiguous = True, nonexistent='shift_forward')
+                    # select any tzone for border timevalues due to daylight savings. Shift time forward for any non-existent time values
+                    modified_dates[column] = modified_dates[column].dt.tz_localize(
+                        unique_tz[0], ambiguous=True, nonexistent="shift_forward"
+                    )
 
         return modified_dates
 
@@ -211,7 +218,7 @@ class TimestampAlignmentNode:
             columns=[self.params.datetime_col + __duplicate],
         )
 
-        df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)      
+        df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)
         # concatenate differenced timestamps with input timestamps
         df3 = pd.DataFrame(
             pd.concat(
@@ -232,12 +239,12 @@ class TimestampAlignmentNode:
                 self.params.datetime_col + NEW_COLUMN,
             ]
         ]
-    
+
     def __validate(self, timestamp_column: pd.Series):
         """
         Validate the timestamp column to ensure remaining execution do not break.
         """
-        
+
         # ideally an option "Skip missing values" should be added to the node configuration,
         # so that the node can skip missing values in the timestamp column and not break.
         # but since it is not available, we prompt user to clean the data before proceeding.
