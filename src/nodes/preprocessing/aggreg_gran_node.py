@@ -390,14 +390,20 @@ class AggregationGranularity:
 
         return df
 
-    def __append_time_zone(self, date_col: pd.DataFrame, zoned: pd.Series):
+    def __append_time_zone(self, date_col: pd.DataFrame, zone: pd.Series):
         """
         This function re-assignes time zones to date&time column. This function is only called if input date&time column containes time zone.
         """
+        # region dbpy_attach
+        import debugpy
+        (debugpy.listen(5678), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
+        # endregion
+        
         # TODO Find faster approach # NOSONAR not urgent
         date_col_internal = date_col
-        for i in range(0, len(zoned.index)):
-            date_col_internal[self.aggreg_params.datetime_col][i] = date_col_internal[
-                self.aggreg_params.datetime_col
-            ][i].replace(tzinfo=zoned.iloc[i])
+        date_col_internal[self.aggreg_params.datetime_col] = date_col_internal[self.aggreg_params.datetime_col].dt.tz_localize(zone[0], ambiguous=True, nonexistent="shift_forward")
+        # for i in range(0, len(zone.index)):
+        #     date_col_internal[self.aggreg_params.datetime_col][i] = date_col_internal[
+        #         self.aggreg_params.datetime_col
+        #     ][i].replace(tzinfo=zone.iloc[i])
         return date_col_internal
