@@ -32,6 +32,7 @@ class TimestampAlignmentNode:
     The final output is sorted in ascending order of newly generated timestsamp.
     Use this in combination with the missing value node to correct missing time series data.
     This node preserves duplicated values and possibly lead to cluttered output. Therefore, in case of duplicated timestamps, we encourage using *Date&Time Aggregator* node before using this node.
+    Currently this does not support time values that contain microseconds or milliseconds
     """
 
     params = TimeStampAlignmentParams()
