@@ -380,7 +380,7 @@ def get_type_timestamp(value_type):
 
 
 ############################################
-# General Helper Class
+# General Helper Functions
 ############################################
 
 
@@ -425,6 +425,9 @@ def __check_col_and_type(
             f"Column '{str(column)}' not available in input table"
         )
 
+def check_cancelled(exec_context: knext.ExecutionContext) -> None:
+    if exec_context.is_canceled():
+        raise ValueError("Execution was cancelled")
 
 ############################################
 # Generic pandas dataframe/series helper function

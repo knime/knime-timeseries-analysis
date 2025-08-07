@@ -33,6 +33,7 @@ try {
                 'knime-reporting',
                 'knime-filehandling',
                 'knime-scripting-editor',
+                'knime-datageneration',
                 repositoryName
                 ],
             ius: [

@@ -108,7 +108,7 @@ class TimestampAlignmentNode:
                 f"""Input timestamp column cannot resample on {selected_period} field. Please change timestamp data type and try again."""
             )
         # following dataframe does contains both old date column and newly populated date column
-        df_time = self.__modify_time(
+        df_time = self.__modify_time(exec_context,
             timestamp_value_factory_class_string, df_time, zone_offset
         )
         exec_context.set_progress(0.4)
@@ -150,7 +150,7 @@ class TimestampAlignmentNode:
         column_names_that_are_int32 = [
             k.name
             for k in input_table._schema._columns
-            if str(k.ktype) == "Number (integer)"
+            if str(k.ktype) == "Number (Integer)"
         ]
 
         for col in column_names_that_are_int32:
@@ -159,7 +159,7 @@ class TimestampAlignmentNode:
         return knext.Table.from_pandas(df)
 
     def __modify_time(
-        self, kn_date_format: str, df_time: pd.DataFrame, tz=None
+        self, exec_context: knext.ExecutionContext, kn_date_format: str, df_time: pd.DataFrame, tz=None
     ) -> pd.DataFrame:
         """
         This function is where the date column is processed to fill in for missing time stamp values
@@ -173,20 +173,20 @@ class TimestampAlignmentNode:
 
         if kn_date_format == kutil.DEF_TIME_LABEL:
             timestamps = pd.Series(timestamps.time)
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_LABEL:
             timestamps = pd.to_datetime(pd.Series(timestamps), format=kutil.DATE_FORMAT)
             timestamps = timestamps.dt.date
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_TIME_LABEL:
             timestamps = pd.to_datetime(
                 pd.Series(timestamps), format=kutil.DATE_TIME_FORMAT
             )
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_ZONED_DATE_LABEL:
             unique_tz = pd.unique(tz)
@@ -198,7 +198,7 @@ class TimestampAlignmentNode:
                     "Selected date&time column contains multiple zones."
                 )
             else:
-                modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+                modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
                     # select any tzone for border timevalues due to daylight savings. Shift time forward for any non-existent time values
                     modified_dates[column] = modified_dates[column].dt.tz_localize(
@@ -207,7 +207,7 @@ class TimestampAlignmentNode:
 
         return modified_dates
 
-    def __align_time(self, timestamps: pd.Series, df: pd.DataFrame) -> pd.DataFrame:
+    def __align_time(self, exec_context: knext.ExecutionContext, timestamps: pd.Series, df: pd.DataFrame) -> pd.DataFrame:
         """
         Create a new column in the existing dataframe, by doing left join on the processed column with the table.
         """
@@ -230,6 +230,7 @@ class TimestampAlignmentNode:
             )
         ).rename(columns={0: self.params.datetime_col + NEW_COLUMN})
 
+        kutil.check_cancelled(exec_context)
         # do a left join and return only the actual time input and updated timestamp column
         final_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
