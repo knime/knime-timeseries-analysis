@@ -9,7 +9,7 @@ long_description:
   plots such as ACF and PACF plots, and performing residual analysis for evaluation to 
   support the use of SARIMA(X) forecasting nodes.
 group_id: org.knime
-version: 5.5.0 # Version of this Python node extension
+version: 5.6.0 # Version of this Python node extension
 vendor: KNIME AG, Zurich, Switzerland
 feature_dependencies:
   - org.knime.features.pythonscripting 5.5.0
