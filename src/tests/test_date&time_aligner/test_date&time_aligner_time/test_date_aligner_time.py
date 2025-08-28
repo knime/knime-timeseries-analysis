@@ -148,7 +148,7 @@ class TestTimeStampAlignmentTime(unittest.TestCase):
         column_names_that_are_int32 = [
             k.name
             for k in self.expected_output_schema_columns
-            if str(k.ktype) == "Number (Integer)"
+            if k.ktype == knext.int32()
         ]
         for col in column_names_that_are_int32:
             input_df[col] = input_df[col].astype(np.dtype("int32"))

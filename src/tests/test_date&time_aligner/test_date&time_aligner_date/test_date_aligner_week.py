@@ -150,7 +150,7 @@ class TestTimeStampAlignmentDate(unittest.TestCase):
         column_names_that_are_int32 = [
             k.name
             for k in self.expected_output_schema_columns
-            if str(k.ktype) == "Number (Integer)"
+            if k.ktype == knext.int32()
         ]
         for col in column_names_that_are_int32:
             input_df[col] = input_df[col].astype(np.dtype("int32"))
@@ -159,7 +159,11 @@ class TestTimeStampAlignmentDate(unittest.TestCase):
 
         expected_schema = knext.Schema.from_columns(self.expected_output_schema_columns)
 
-        self.assertEqual(expected_schema, table.schema)
+        self.assertEqual(
+            expected_schema,
+            table.schema,
+            f"Schema did not match expected schema:\nSchema={table.schema}\n\nExpected={expected_schema}",
+        )
 
     # commented this out since node execution fails,
     # node is unable to fetch the pandas logical extension type that is registered with the value factory string

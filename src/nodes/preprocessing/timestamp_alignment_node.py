@@ -149,9 +149,7 @@ class TimestampAlignmentNode:
 
         # added a patch that ensures that columns that are int32 STAY int32 when sent back to KNIME
         column_names_that_are_int32 = [
-            k.name
-            for k in input_table._schema._columns
-            if str(k.ktype) == "Number (Integer)"
+            k.name for k in input_table._schema._columns if k.ktype == knext.int32()
         ]
 
         for col in column_names_that_are_int32:
