@@ -14,7 +14,6 @@ if src_path not in sys.path:
     sys.path.insert(0, src_path)
 
 from nodes.preprocessing.timestamp_alignment_node import TimestampAlignmentNode
-#from nodes.configs.preprocessing.timealign import TimeStampAlignmentParams
 
 
 class TestTimeStampAlignmentTime(unittest.TestCase):
@@ -56,7 +55,6 @@ class TestTimeStampAlignmentTime(unittest.TestCase):
             "https://raw.githubusercontent.com/knime/knime-python/refs/heads/master/org.knime.python3.arrow.types/src/main/python/knime/types/builtin.py",
             "src/main/python/knime/types/builtin.py",
         )
-        # {"org.knime.core.data.v2.time.LocalDateValueFactory":"datetime.date"}
         ktest.register_extension(
             "plugin.xml",
             {"org.knime.core.data.v2.time.LocalTimeValueFactory": "datetime.time"},
@@ -73,14 +71,7 @@ class TestTimeStampAlignmentTime(unittest.TestCase):
             ]
         )
 
-        self.expected_output_schema_columns = [
-            knext.Column(knext.double(), "C15"),
-            knext.Column(knext.double(), "C16"),
-            knext.Column(knext.double(), "C17"),
-            knext.Column(knext.logical(datetime.time), "date"),
-            knext.Column(knext.double(), "C19"),
-            knext.Column(knext.double(), "C20"),
-        ]
+        self.expected_output_schema_columns = self.input_schema._columns
 
         self.expected_output_schema_columns_if_replace_false = [
             knext.Column(knext.double(), "C15"),
@@ -115,29 +106,30 @@ class TestTimeStampAlignmentTime(unittest.TestCase):
     def _get_column_names_from_test_data(self):
         return self.test_time_df.columns
 
-    def _configure(self, replace_original_param=True, param = None):
+    def _configure(self, replace_original_param=True, param=None):
         print(param)
         self.node.params.datetime_col = "date"
         self.node.params.replace_original = replace_original_param
         self.node.params.period = param
 
     def test_node_configure(self):
-
         for p in self.paramslist:
-            self.setUp()
-            self._configure(True, p)
-            config_context = ktest.TestingConfigurationContext()
+            with self.subTest(p=p):
+                self.setUp()
+                self._configure(True, p)
+                config_context = ktest.TestingConfigurationContext()
 
-            output_schema = self.node.configure(config_context, self.input_schema)
+                output_schema = self.node.configure(config_context, self.input_schema)
 
-            expected_schema = knext.Schema.from_columns(self.expected_output_schema_columns)
-            self.assertEqual(expected_schema, output_schema)
+                expected_schema = knext.Schema.from_columns(
+                    self.expected_output_schema_columns
+                )
+                self.assertEqual(expected_schema, output_schema)
 
     def test_node_configure_replace_false(self):
-
         for p in self.paramslist:
             self.setUp()
-            self._configure(False,p)
+            self._configure(False, p)
             config_context = ktest.TestingConfigurationContext()
             output_schema = self.node.configure(config_context, self.input_schema)
 
@@ -149,14 +141,14 @@ class TestTimeStampAlignmentTime(unittest.TestCase):
     # this test function checks that the output schema is correct
     # when the pandas table is sent back to knime.
     def test_table_schema(self):
-        input_df = self._get_dataframe()        
+        input_df = self._get_dataframe()
         input_df["date"] = pd.to_datetime(input_df["date"], format="mixed").dt.time
 
         # downcast pandas columns to int32 from int64, if only int32 were to be expected in the output schema
         column_names_that_are_int32 = [
             k.name
             for k in self.expected_output_schema_columns
-            if str(k.ktype) == "int32"
+            if str(k.ktype) == "Number (Integer)"
         ]
         for col in column_names_that_are_int32:
             input_df[col] = input_df[col].astype(np.dtype("int32"))

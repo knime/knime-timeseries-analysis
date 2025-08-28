@@ -166,6 +166,7 @@ def convert_timestamp(value):
     except Exception as e:
         raise ValueError(f"Failed to convert value '{value}' to pandas Timestamp: {e}")
 
+
 def safe_to_datetime(series, format=None):
     """
     Converts a pandas Series to datetime, raising ValueError on failure.
@@ -176,8 +177,11 @@ def safe_to_datetime(series, format=None):
         else:
             return pd.to_datetime(series)
     except Exception as e:
-        raise ValueError(f"Failed to convert series to datetime with format '{format}': {e}")
-    
+        raise ValueError(
+            f"Failed to convert series to datetime with format '{format}': {e}"
+        )
+
+
 def extract_zone(value):
     """
     This function extracts the time zone from each timestamp value in the pandas timmestamp column.
@@ -188,8 +192,7 @@ def extract_zone(value):
 
 def localize_timezone(value: pd.Timestamp, zone) -> pd.Timestamp:
     """
-    This function updates the Pandas Timestamp value with the time zone. If "None" is passed timezone will be removed from
-    column returning a value with no timezone.
+    This function updates the Pandas Timestamp value with the time zone. If None is passed for zone, the timezone will be removed from the given value.
     @return: assigns timezone to timestamp.
 
     """
@@ -335,8 +338,8 @@ def extract_time_fields(
 
     mapping = field_mappings[date_time_format]
 
-    #following line can be redundant, in case the date&time aggregator and date&time aligner 
-    # can function with all supported datetime types, conversion to 'to_datetime()' from 
+    # following line can be redundant, in case the date&time aggregator and date&time aligner
+    # can function with all supported datetime types, conversion to 'to_datetime()' from
     # and already converted series would not be needed.
     df = pd.to_datetime(date_time_col, format=mapping["format"]).to_frame(
         name=series_name
@@ -425,9 +428,11 @@ def __check_col_and_type(
             f"Column '{str(column)}' not available in input table"
         )
 
+
 def check_cancelled(exec_context: knext.ExecutionContext) -> None:
     if exec_context.is_canceled():
         raise ValueError("Execution was cancelled")
+
 
 ############################################
 # Generic pandas dataframe/series helper function
@@ -462,6 +467,3 @@ def count_negative_values(column: pd.Series) -> int:
     total_neg = (column <= 0).sum()
 
     return total_neg
-
-
-

@@ -12,5 +12,5 @@ group_id: org.knime
 version: 5.7.0 # Version of this Python node extension
 vendor: KNIME AG, Zurich, Switzerland
 feature_dependencies:
-  - org.knime.features.pythonscripting 5.5.0
+  - org.knime.features.pythonscripting 5.7.0
 license_file: LICENSE.TXT
