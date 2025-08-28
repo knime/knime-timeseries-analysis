@@ -40,10 +40,6 @@ class TimestampAlignmentNode:
     def configure(
         self, configure_context: knext.ConfigurationContext, input_schema: knext.Schema
     ):
-        # region dbpy_attach
-        import debugpy
-        (debugpy.listen(5678), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
-        # endregion
         
         self.params.datetime_col = kutil.column_exists_or_preset(
             configure_context,

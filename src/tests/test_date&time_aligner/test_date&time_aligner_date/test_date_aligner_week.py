@@ -55,10 +55,6 @@ class TestTimeStampAlignmentDate(unittest.TestCase):
             "https://raw.githubusercontent.com/knime/knime-python/refs/heads/master/org.knime.python3.arrow.types/src/main/python/knime/types/builtin.py",
             "src/main/python/knime/types/builtin.py",
         )
-        # region dbpy_attach
-        import debugpy
-        (debugpy.listen(5678), debugpy.wait_for_client()) if not debugpy.is_client_connected() else None
-        # endregion
         
         ktest.register_extension(
             "plugin.xml",
