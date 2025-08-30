@@ -32,6 +32,7 @@ class TimestampAlignmentNode:
     The final output is sorted in ascending order of newly generated timestsamp.
     Use this in combination with the missing value node to correct missing time series data.
     This node preserves duplicated values and possibly lead to cluttered output. Therefore, in case of duplicated timestamps, we encourage using *Date&Time Aggregator* node before using this node.
+    Currently this does not support time values that contain microseconds or milliseconds
     """
 
     params = TimeStampAlignmentParams()
@@ -39,6 +40,7 @@ class TimestampAlignmentNode:
     def configure(
         self, configure_context: knext.ConfigurationContext, input_schema: knext.Schema
     ):
+        
         self.params.datetime_col = kutil.column_exists_or_preset(
             configure_context,
             self.params.datetime_col,
@@ -46,7 +48,13 @@ class TimestampAlignmentNode:
             kutil.is_type_timestamp,
         )
 
-        date_ktype = input_schema[[self.params.datetime_col]].delegate._columns[0].ktype
+        date_ktype = (
+            input_schema[[self.params.datetime_col]]
+            .delegate._columns[
+                input_schema.column_names.index(self.params.datetime_col)
+            ]
+            .ktype
+        )
 
         if not self.params.replace_original:
             datetime_index = (
@@ -63,7 +71,11 @@ class TimestampAlignmentNode:
 
     def execute(self, exec_context: knext.ExecutionContext, input_table: knext.Table):
         df = input_table.to_pandas()
+
         datetime_col = df[self.params.datetime_col]
+
+        self.__validate(datetime_col)
+
         timestamp_value_factory_class_string = kutil.get_type_timestamp(
             str(datetime_col.dtype)
         )
@@ -96,14 +108,11 @@ class TimestampAlignmentNode:
             raise knext.InvalidParametersError(
                 f"""Input timestamp column cannot resample on {selected_period} field. Please change timestamp data type and try again."""
             )
-
-        df_time = self.__modify_time(
+        # following dataframe does contains both old date column and newly populated date column
+        df_time = self.__modify_time(exec_context,
             timestamp_value_factory_class_string, df_time, zone_offset
         )
         exec_context.set_progress(0.4)
-
-        # Necessary to avoid new suffixes on datetime_col in the df_time.merge step afterwards
-        df = df.drop(columns=[self.params.datetime_col])
 
         df = (
             df_time.merge(df, how="left", left_index=True, right_index=True)
@@ -121,10 +130,35 @@ class TimestampAlignmentNode:
             )
         exec_context.set_progress(0.9)
 
+        # get specs from configure and ensure that columns in dataframe are in the same order.
+        if not self.params.replace_original:
+            datetime_index = (
+                input_table.schema.column_names.index(self.params.datetime_col) + 1
+            )
+
+            # get shallow copy of the list of column names and insert the new datetime column
+            # next to the index of the original datetime column
+            new_list = input_table.schema.column_names.copy()
+            new_list.insert(datetime_index, self.params.datetime_col + NEW_COLUMN)
+
+            df = df.loc[:, new_list]
+
+        # if Replace timestamp column is true, then we need to ensure that the columns in the dataframe are in the same order as the input table schema
+        else:
+            df = df.loc[:, input_table.schema.column_names]
+
+        # added a patch that ensures that columns that are int32 STAY int32 when sent back to KNIME
+        column_names_that_are_int32 = [
+            k.name for k in input_table._schema._columns if k.ktype == knext.int32()
+        ]
+
+        for col in column_names_that_are_int32:
+            df[col] = df[col].astype(pd.Int32Dtype())
+
         return knext.Table.from_pandas(df)
 
     def __modify_time(
-        self, kn_date_format: str, df_time: pd.DataFrame, tz=None
+        self, exec_context: knext.ExecutionContext, kn_date_format: str, df_time: pd.DataFrame, tz=None
     ) -> pd.DataFrame:
         """
         This function is where the date column is processed to fill in for missing time stamp values
@@ -138,40 +172,41 @@ class TimestampAlignmentNode:
 
         if kn_date_format == kutil.DEF_TIME_LABEL:
             timestamps = pd.Series(timestamps.time)
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_LABEL:
             timestamps = pd.to_datetime(pd.Series(timestamps), format=kutil.DATE_FORMAT)
             timestamps = timestamps.dt.date
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_DATE_TIME_LABEL:
             timestamps = pd.to_datetime(
                 pd.Series(timestamps), format=kutil.DATE_TIME_FORMAT
             )
 
-            modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+            modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
 
         elif kn_date_format == kutil.DEF_ZONED_DATE_LABEL:
-            unique_tz = pd.unique(tz.astype(str))
+            unique_tz = pd.unique(tz)
 
-            LOGGER.warn("Timezones in the column:" + str(unique_tz))
+            LOGGER.warning("Timezone(s) in the column:" + str(unique_tz))
 
             if len(unique_tz) > 1:
                 raise knext.InvalidParametersError(
                     "Selected date&time column contains multiple zones."
                 )
             else:
-                modified_dates = self.__align_time(timestamps=timestamps, df=df_time)
+                modified_dates = self.__align_time(exec_context, timestamps=timestamps, df=df_time)
                 for column in modified_dates.columns:
+                    # select any tzone for border timevalues due to daylight savings. Shift time forward for any non-existent time values
                     modified_dates[column] = modified_dates[column].dt.tz_localize(
-                        tz[0]
+                        unique_tz[0], ambiguous=True, nonexistent="shift_forward"
                     )
 
         return modified_dates
 
-    def __align_time(self, timestamps: pd.Series, df: pd.DataFrame) -> pd.DataFrame:
+    def __align_time(self, exec_context: knext.ExecutionContext, timestamps: pd.Series, df: pd.DataFrame) -> pd.DataFrame:
         """
         Create a new column in the existing dataframe, by doing left join on the processed column with the table.
         """
@@ -184,7 +219,6 @@ class TimestampAlignmentNode:
         )
 
         df2 = df2.set_index(self.params.datetime_col + __duplicate, drop=False)
-
         # concatenate differenced timestamps with input timestamps
         df3 = pd.DataFrame(
             pd.concat(
@@ -195,6 +229,7 @@ class TimestampAlignmentNode:
             )
         ).rename(columns={0: self.params.datetime_col + NEW_COLUMN})
 
+        kutil.check_cancelled(exec_context)
         # do a left join and return only the actual time input and updated timestamp column
         final_df = df3.merge(  # NOSONAR 'on' and 'validate'  do not really need do be specified here
             df, how="left", left_index=True, right_index=True, sort=True
@@ -202,7 +237,19 @@ class TimestampAlignmentNode:
 
         return final_df[
             [
-                self.params.datetime_col,
                 self.params.datetime_col + NEW_COLUMN,
             ]
         ]
+
+    def __validate(self, timestamp_column: pd.Series):
+        """
+        Validate the timestamp column to ensure remaining execution do not break.
+        """
+
+        # ideally an option "Skip missing values" should be added to the node configuration,
+        # so that the node can skip missing values in the timestamp column and not break.
+        # but since it is not available, we prompt user to clean the data before proceeding.
+        if kutil.check_missing_values(timestamp_column):
+            raise ValueError(
+                "The selected timestamp column contains missing values. Please clean the data before proceeding."
+            )

@@ -24,7 +24,7 @@ class TimeStampAlignmentParams:
         )
         WEEK = (
             "Week",
-            """Imupte missing weeks in the given range""",
+            """Impute missing weeks in the given range""",
         )
         DAY = (
             "Day",
@@ -82,14 +82,14 @@ class TimeStampAlignmentParams:
             return cls.HOUR
 
     datetime_col = knext.ColumnParameter(
-        label="Timestamp Column",
+        label="Timestamp column",
         description="Timestamp column containing missing timestamps.",
         port_index=0,
         column_filter=kutil.is_type_timestamp,
     )
 
     replace_original = knext.BoolParameter(
-        label="Replace Timestamp Column",
+        label="Replace timestamp column",
         description="Check this box in order to preserve the original timestamp column in the input table.",
         default_value=True,
     )
